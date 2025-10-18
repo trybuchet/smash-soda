@@ -31,6 +31,8 @@ void Config::Load() {
 			cfg.general.hotkeyLock = setValue(cfg.general.hotkeyLock, j["General"]["hotkeyLock"].get<bool>());
 			cfg.general.blockVPN = setValue(cfg.general.blockVPN, j["General"]["blockVPN"].get<bool>());
 			cfg.general.devMode = setValue(cfg.general.devMode, j["General"]["devMode"].get<bool>());
+			cfg.general.autorun = setValue(cfg.general.devMode, j["General"]["autorun"].get<bool>());
+			cfg.general.logShareLink = setValue(cfg.general.logShareLink, j["General"]["logShareLink"].get<bool>());
 
 			// Set Audio properties
 			cfg.audio.inputDevice = setValue(cfg.audio.inputDevice, j["Audio"]["inputDevice"].get<unsigned int>());
@@ -209,7 +211,9 @@ void Config::Save() {
 		{"hotkeyBB", cfg.general.hotkeyBB},
 		{"hotkeyLock", cfg.general.hotkeyLock},
 		{"blockVPN", cfg.general.blockVPN},
-		{"devMode", cfg.general.devMode}
+		{"devMode", cfg.general.devMode},
+		{"autorun", cfg.general.autorun},
+		{"logShareLink", cfg.general.logShareLink}
 	};
 
 	// Audio

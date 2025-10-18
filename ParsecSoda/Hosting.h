@@ -229,6 +229,7 @@ private:
 	thread _gamepadThread;
 	thread _createGamepadsThread;
 	thread _connectGamepadsThread;
+	thread _autorunSmashSodaThread;
 
 	mutex _mediaMutex;
 	mutex _inputMutex;

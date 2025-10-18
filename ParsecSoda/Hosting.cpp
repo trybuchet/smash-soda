@@ -118,8 +118,8 @@ void Hosting::broadcastChatMessageAndLogCommand(string message)
 }
 
 void Hosting::init() {
-	
-	_parsecStatus = ParsecInit(NULL, NULL, (char *)SDK_PATH, &_parsec);
+
+	_parsecStatus = ParsecInit(NULL, NULL, (char*)SDK_PATH, &_parsec);
 	_dx11.init();
 	_gamepadClient.setParsec(_parsec);
 	_gamepadClient.init();
@@ -131,7 +131,7 @@ void Hosting::init() {
 		_createGamepadsThread.detach();
 		_macro.init(_gamepadClient, _guestList);
 		_tournament.init(*_parsec, _guestList, _gamepadClient, _chatLog, _macro);
-	});
+		});
 
 	audioOut.fetchDevices();
 	vector<AudioSourceDevice> audioOutDevices = audioOut.getDevices();
@@ -168,6 +168,24 @@ void Hosting::init() {
 
 	// Parsec Logs
 	ParsecSetLogCallback(_parsec, Hosting::LogCallback, this);
+
+	if (Config::cfg.general.autorun) {
+		_autorunSmashSodaThread = thread([&]() {
+		Sleep(20000); // Make sure Smash Soda is ready to host
+		if (isReady()) {
+			ParsecHostConfig cfg = getHostConfig();
+			setHostConfig("", cfg.gameID, 4, false, "shhiamasecretcode");
+			applyHostConfig();
+			startHosting();
+			if (!Config::cfg.room.privateRoom) {
+				Arcade::instance.createPost();
+			}
+
+			getGamepadClient().connectAllGamepads();
+		}
+		_autorunSmashSodaThread.detach();
+			});
+	}
 	
 }
 
@@ -443,6 +461,26 @@ void Hosting::startHosting() {
 
 	// Update config
 	Config::cfg.Save();
+
+	// Log share link to file
+	if (Config::cfg.general.logShareLink) {
+
+		// File path
+		string configPath = PathHelper::GetConfigPath();
+		string filePath = configPath + "share_link.txt";
+
+		// Write share link to file
+		char link[256];
+		if (Config::cfg.room.privateRoom) {
+			strcpy_s(link, (string("https://parsec.gg/g/") + getSession().hostPeerId + "/" + Config::cfg.room.secret + "/").c_str());
+		}
+		else {
+			string arcadeLink = "https://soda-arcade.com/invite/" + Arcade::instance.credentials.username + "/room";
+			strcpy_s(link, arcadeLink.c_str());
+		}
+		MTY_WriteTextFile(filePath.c_str(), "%s", link);
+
+	}
 
 	if (!_isRunning) {
 		_isRunning = true;

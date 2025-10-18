@@ -35,6 +35,8 @@ public:
 		bool hotkeyLock = true;
 		bool blockVPN = false;
 		bool devMode = false;
+		bool autorun = false;
+		bool logShareLink = false;
 	};
 	
 	class Audio {

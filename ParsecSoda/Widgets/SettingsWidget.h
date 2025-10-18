@@ -31,6 +31,8 @@ private:
 
 	bool _microphoneEnabled = false;
 	bool _disableGuideButton = false;
+	bool _autorunEnabled = false;
+	bool _logShareLink = false;
 	bool _disableKeyboard = false;
 	bool _latencyLimitEnabled = false;
 	bool _leaderboardEnabled = false;

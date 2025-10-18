@@ -18,6 +18,8 @@ SettingsWidget::SettingsWidget(Hosting& hosting)
     _parsecLogs = Config::cfg.general.parsecLogs;
     _blockVPN = Config::cfg.general.blockVPN;
     _devMode = Config::cfg.general.devMode;
+	_autorunEnabled = Config::cfg.general.autorun;
+	_logShareLink = Config::cfg.general.logShareLink;
 
     _microphoneEnabled = Config::cfg.audio.micEnabled;
 
@@ -194,6 +196,18 @@ void SettingsWidget::renderGeneral() {
     AppStyle::pop();
 
     ImGui::Dummy(ImVec2(0, 20.0f));
+
+    if (ImForm::InputCheckbox("Auto Host", _autorunEnabled,
+        "When enabled, Smash Soda will automatically start hosting on startup, after 20 seconds.")) {
+		Config::cfg.general.autorun = _autorunEnabled;
+        Config::cfg.Save();
+    }
+
+	if (ImForm::InputCheckbox("Log Share Links", _logShareLink,
+		"When enabled, Smash Soda will log the share link to your room when you start hosting, to a text file in the config folder.")) {
+		Config::cfg.general.logShareLink = _logShareLink;
+		Config::cfg.Save();
+	}
 
     if (ImForm::InputCheckbox("Disable Guide Button", _disableGuideButton,
         "The guide button by default often brings up overlays in software, which can cause issues when hosting.")) {
