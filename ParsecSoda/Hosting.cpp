@@ -469,15 +469,14 @@ void Hosting::startHosting() {
 		string configPath = PathHelper::GetConfigPath();
 		string filePath = configPath + "share_link.txt";
 
+		// If file already exists, remove it
+		if (MTY_FileExists(filePath.c_str())) {
+			MTY_DeleteFile(filePath.c_str());
+		}
+
 		// Write share link to file
 		char link[256];
-		if (Config::cfg.room.privateRoom) {
-			strcpy_s(link, (string("https://parsec.gg/g/") + getSession().hostPeerId + "/" + Config::cfg.room.secret + "/").c_str());
-		}
-		else {
-			string arcadeLink = "https://soda-arcade.com/invite/" + Arcade::instance.credentials.username + "/room";
-			strcpy_s(link, arcadeLink.c_str());
-		}
+		strcpy_s(link, (string("https://parsec.gg/g/") + getSession().hostPeerId + "/" + Config::cfg.room.secret + "/").c_str());
 		MTY_WriteTextFile(filePath.c_str(), "%s", link);
 
 	}
