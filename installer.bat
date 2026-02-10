@@ -52,6 +52,7 @@ pause >nul
 set "BRANCH=preview"
 set "REPO_URL=https://github.com/trybuchet/smash-soda.git"
 set "SMASH_GLASS_URL=https://github.com/trybuchet/smash-soda-overlay/releases/download/4.0.0/smash-glass.zip"
+set "VIGEMBUS_URL=https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe"
 
 :: VS Build Tools 2026 bootstrapper (fallback if winget is missing)
 set "VS_BUILD_TOOLS_URL=https://download.visualstudio.microsoft.com/download/pr/6efb3484-905b-485c-8b5f-9d3a5f39e731/07908cd6d91e75b8ea4339d8f2cfa6e8d8bb4fd706af7b918ae391cd6fc2a066/vs_BuildTools.exe"
@@ -88,6 +89,7 @@ set "WORK=%LOCALAPPDATA%\SmashSodaInstaller"
 set "SRC=%WORK%\src"
 set "BUILD=%WORK%\build"
 set "OVERLAY_ZIP=%WORK%\smash-glass.zip"
+set "VIGEMBUS_SETUP=%WORK%\ViGEmBus_1.22.0_x64_x86_arm64.exe"
 set "VS_BOOTSTRAP=%WORK%\vs_BuildTools.exe"
 set "CMAKE_MSI=%WORK%\cmake-%CMAKE_VERSION%.msi"
 set "GIT_SETUP=%WORK%\Git-64-bit.exe"
@@ -133,7 +135,7 @@ exit /b 0
 
 :: --------- Install Git ----------
 echo.
-echo [1/7] Installing Git...
+echo [1/8] Installing Git...
 where git >nul 2>&1
 if %errorlevel% neq 0 (
   where winget >nul 2>&1
@@ -162,7 +164,7 @@ if %errorlevel% neq 0 (
 
 :: --------- Install Build Tools ----------
 echo.
-echo [2/7] Installing Visual Studio Build Tools (C++ toolchain)...
+echo [2/8] Installing Visual Studio Build Tools (C++ toolchain)...
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 set "VSINSTALL="
 if exist "%VSWHERE%" (
@@ -190,7 +192,7 @@ if defined VSINSTALL (
 
 :: --------- Install CMake ----------
 echo.
-echo [3/7] Installing CMake %CMAKE_VERSION%...
+echo [3/8] Installing CMake %CMAKE_VERSION%...
 where cmake >nul 2>&1
 if %errorlevel% neq 0 (
   call :download "%CMAKE_MSI_URL%" "%CMAKE_MSI%" "CMake %CMAKE_VERSION%"
@@ -203,7 +205,16 @@ if %errorlevel% neq 0 (
 
 :: --------- Clone source ----------
 echo.
-echo [4/7] Cloning Smash Soda (%BRANCH% branch)...
+echo [4/8] Installing ViGEmBus driver...
+call :download "%VIGEMBUS_URL%" "%VIGEMBUS_SETUP%" "ViGEmBus Driver"
+if not exist "%VIGEMBUS_SETUP%" (
+  echo ERROR: ViGEmBus installer was not downloaded.
+  exit /b 1
+)
+"%VIGEMBUS_SETUP%" /qn
+
+echo.
+echo [5/8] Cloning Smash Soda (%BRANCH% branch)...
 set "SRC_DIR=%SRC%\smash-soda"
 if exist "%SRC_DIR%" rmdir /s /q "%SRC_DIR%"
 git clone --branch "%BRANCH%" --single-branch "%REPO_URL%" "%SRC_DIR%"
@@ -220,12 +231,12 @@ if exist "%VSWHERE%" (
 
 :: --------- Build ----------
 echo.
-echo [5/7] Configuring CMake...
+echo [6/8] Configuring CMake...
 cmake -S "%SRC_DIR%" -B "%BUILD%" -G "%VS_GENERATOR%" -A x64
 if %errorlevel% neq 0 exit /b 1
 
 echo.
-echo [6/7] Building Release...
+echo [7/8] Building Release...
 mkdir "%SRC_DIR%\x64\release" 2>nul
 cmake --build "%BUILD%" --config Release
 if %errorlevel% neq 0 exit /b 1
@@ -238,7 +249,7 @@ if not exist "%RELEASE_DIR%" (
 )
 
 echo.
-echo [7/7] Installing Smash Soda...
+echo [8/8] Installing Smash Soda...
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 xcopy "%RELEASE_DIR%\*" "%INSTALL_DIR%\" /E /I /Y >nul
 
@@ -250,6 +261,8 @@ mkdir "%OVERLAY_DIR%" 2>nul
 call :download "%SMASH_GLASS_URL%" "%OVERLAY_ZIP%" "Smash Glass"
 %PS% -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%OVERLAY_ZIP%' -DestinationPath '%OVERLAY_DIR%' -Force"
 del /f /q "%OVERLAY_ZIP%" >nul 2>&1
+if not exist "%OVERLAY_DIR%\plugins" mkdir "%OVERLAY_DIR%\plugins"
+if not exist "%OVERLAY_DIR%\themes" mkdir "%OVERLAY_DIR%\themes"
 
 :: Unblock overlay files
 %PS% -NoProfile -ExecutionPolicy Bypass -Command ^
@@ -261,38 +274,47 @@ echo Smash Soda installed at: "%INSTALL_DIR%"
 echo Overlay installed at: "%OVERLAY_DIR%"
 echo.
 
+call :shortcuts
+
+echo Cleaning up installer files...
+rmdir /s /q "%WORK%"
+exit /b 0
+
 :: --------- Optional shortcut ----------
+:shortcuts
+setlocal EnableExtensions DisableDelayedExpansion
 set "APP_NAME=Smash Soda"
 set "APP_EXE=%INSTALL_DIR%\SmashSoda.exe"
 if not exist "%APP_EXE%" set "APP_EXE=%RELEASE_DIR%\SmashSoda.exe"
 
-if exist "%APP_EXE%" (
-  set /p "MAKE_SHORTCUT=Create desktop shortcut and Start Menu entry? [Y/N]: "
-  if /i "%MAKE_SHORTCUT%"=="Y" (
-    %PS% -NoProfile -ExecutionPolicy Bypass -Command ^
-      "$w=New-Object -ComObject WScript.Shell;" ^
-      "$d=$env:USERPROFILE+'\Desktop\%APP_NAME%.lnk';" ^
-      "$s=$w.CreateShortcut($d);" ^
-      "$s.TargetPath='%APP_EXE%';" ^
-      "$s.WorkingDirectory='%INSTALL_DIR%';" ^
-      "$s.IconLocation='%APP_EXE%';" ^
-      "$s.Save();"
-    %PS% -NoProfile -ExecutionPolicy Bypass -Command ^
-      "$w=New-Object -ComObject WScript.Shell;" ^
-      "$folder=$env:ProgramData+'\Microsoft\Windows\Start Menu\Programs\Trybuchet';" ^
-      "New-Item -ItemType Directory -Path $folder -Force | Out-Null;" ^
-      "$p=$folder+'\%APP_NAME%.lnk';" ^
-      "$s=$w.CreateShortcut($p);" ^
-      "$s.TargetPath='%APP_EXE%';" ^
-      "$s.WorkingDirectory='%INSTALL_DIR%';" ^
-      "$s.IconLocation='%APP_EXE%';" ^
-      "$s.Save();"
-    echo Shortcuts created on Desktop and Start Menu (Trybuchet).
-  ) else (
-    echo Skipped shortcut creation.
-  )
-) else (
+if not exist "%APP_EXE%" (
   echo WARNING: Could not find SmashSoda.exe to create a shortcut.
+  exit /b 0
 )
 
+choice /C YN /N /M "Create desktop shortcut and Start Menu entry? [Y/N]: "
+if errorlevel 2 (
+  echo Skipped shortcut creation.
+  exit /b 0
+)
+
+%PS% -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$w=New-Object -ComObject WScript.Shell;" ^
+  "$d=$env:USERPROFILE+'\Desktop\%APP_NAME%.lnk';" ^
+  "$s=$w.CreateShortcut($d);" ^
+  "$s.TargetPath='%APP_EXE%';" ^
+  "$s.WorkingDirectory='%INSTALL_DIR%';" ^
+  "$s.IconLocation='%APP_EXE%';" ^
+  "$s.Save();"
+%PS% -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$w=New-Object -ComObject WScript.Shell;" ^
+  "$folder=$env:ProgramData+'\Microsoft\Windows\Start Menu\Programs\Trybuchet';" ^
+  "New-Item -ItemType Directory -Path $folder -Force | Out-Null;" ^
+  "$p=$folder+'\%APP_NAME%.lnk';" ^
+  "$s=$w.CreateShortcut($p);" ^
+  "$s.TargetPath='%APP_EXE%';" ^
+  "$s.WorkingDirectory='%INSTALL_DIR%';" ^
+  "$s.IconLocation='%APP_EXE%';" ^
+  "$s.Save();"
+echo Shortcuts created on Desktop and Start Menu (Trybuchet).
 exit /b 0

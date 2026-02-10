@@ -238,12 +238,6 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
 
     if (!Config::cfg.developer.skipUpdateCheck && Cache::cache.checkForUpdates()) {
         versionWidget.showUpdate = true;
-        Config::cfg.overlay.update = Cache::cache.update.overlay;
-        Config::cfg.Save();
-
-        if (Config::cfg.overlay.update) {
-            versionWidget.showDownload = true;
-        }
     }
 
     // =====================================================================

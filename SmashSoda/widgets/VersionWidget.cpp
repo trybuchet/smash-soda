@@ -307,13 +307,13 @@ bool VersionWidget::renderUpdateWindow() {
 
     AppColors::pushButtonSolid();
     
-    if (!Cache::cache.update.critical) {
-        ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.5f - 50);
-        if (ImGui::Button("Close")) {
-            showUpdate = false;
-        }
-        AppColors::popButton();
-    }
+    // if (!Cache::cache.update.critical) {
+    //     ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.5f - 50);
+    //     if (ImGui::Button("Close")) {
+    //         showUpdate = false;
+    //     }
+    //     AppColors::popButton();
+    // }
 
     ImGui::PopStyleColor();
     ImGui::PopFont();

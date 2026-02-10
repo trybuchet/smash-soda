@@ -168,6 +168,9 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         "${CMAKE_SOURCE_DIR}/SmashSoda/icons" $<TARGET_FILE_DIR:${PROJECT_NAME}>/icons
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/SmashSoda/sfx" $<TARGET_FILE_DIR:${PROJECT_NAME}>/sfx
+    # updater.bat
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/updater.bat" $<TARGET_FILE_DIR:${PROJECT_NAME}>
     # DLLs
     COMMAND ${CMAKE_COMMAND} -E copy
         "${CMAKE_SOURCE_DIR}/Dependencies/parsecsdk/windows/parsec.dll" $<TARGET_FILE_DIR:${PROJECT_NAME}>

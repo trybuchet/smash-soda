@@ -30,8 +30,7 @@ public:
 	public:
 		string version = ""; 				// The latest version available
 		string notes = ""; 					// The markdown notes for the latest version
-		bool overlay = false; 				// Whether the overlay files need updating
-		bool critical = true; 				// Whether the update is critical
+		string overlay = ""; 				// Whether the overlay files need updating
 	};
 
     class Artwork {

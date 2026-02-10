@@ -1,6 +1,7 @@
 ﻿#include "Cache.h"
 #include <thread>
 #include <chrono>
+#include "Config.h"
 
 // These are the sort of issues Parsec introduced when
 // they forbid me from providing builds... ¬_¬
@@ -53,15 +54,6 @@ Cache::Cache() {
 
 	// Get the VPN list
 	getVPNList();
-
-	// Start thread to check for updates
-	std::thread updateThread = std::thread([this]() {
-		while (true) {
-			std::this_thread::sleep_for(std::chrono::minutes(2));
-			checkForUpdates();
-		}
-	});
-	updateThread.detach();
 
 }
 
@@ -167,6 +159,10 @@ bool Cache::deleteSessionCache() {
  * Check for Smash Soda updates.
  */
 bool Cache::checkForUpdates() {
+	// Respect developer setting to skip update checks
+	if (Config::cfg.developer.skipUpdateCheck) {
+		return false;
+	}
 	
 	string data = "";
 	size_t bodySize = sizeof(char) * data.length();
@@ -180,8 +176,12 @@ bool Cache::checkForUpdates() {
 	string headers = "Content-Type: application/json\r\n";
 	headers += "Content-Length: " + to_string(bodySize) + "\r\n";
 
-	string domain = "gist.githubusercontent.com";
-	string path = "/MickeyUK/48e2000c8194a38b30c79bdb629252a8/raw";
+	string domain = "raw.githubusercontent.com";
+	// Add a cache-buster to avoid CDN stale responses
+	const auto ts = std::chrono::duration_cast<std::chrono::seconds>(
+		std::chrono::system_clock::now().time_since_epoch()
+	).count();
+	string path = "/trybuchet/smash-soda-registry/refs/heads/main/app.json?ts=" + std::to_string(ts);
 	string method = "GET";
 
 	const bool success = MTY_HttpRequest(
@@ -192,41 +192,43 @@ bool Cache::checkForUpdates() {
 	);
 
 	const char* responseStr = (const char*)response;
-	if (responseSize > 0 && _status == 200) {
+	if (responseSize > 0 && _status == 200 && responseStr != nullptr) {
 		string responseString = string(responseStr, responseSize);
-		json j = json::parse(responseString);
 
-		// Set update properties
-		update.version = j["version"].get<string>();
-		update.notes = j["notes"].get<string>();
-		update.overlay = j["overlay"].get<bool>();
-		update.critical = j["critical"].get<bool>();
+		try {
+			json j = json::parse(responseString);
 
-		// Add banned users if not already banned
-		globalBans.clear();
-		for (auto& bannedId : j["banned"]) {
-			if (!isGlobalBanned(bannedId.get<uint32_t>())) {
-				addGlobalBan(bannedId.get<uint32_t>());
+			// Set update properties (safe defaults if keys are missing)
+			update.version = j.value("version", version);
+			update.notes = j.value("notes", "");
+			update.overlay = j.value("overlay", "");
+
+			// Add banned users if not already banned
+			globalBans.clear();
+			if (j.contains("banned") && j["banned"].is_array()) {
+				for (auto& bannedId : j["banned"]) {
+					if (bannedId.is_number_unsigned() && !isGlobalBanned(bannedId.get<uint32_t>())) {
+						addGlobalBan(bannedId.get<uint32_t>());
+					}
+				}
 			}
-		}
 
-		// Add the SODA COPS!!!
-		sodaCops.clear();
-		for (auto& copId : j["cops"]) {
-			if (!isSodaCop(copId.get<uint32_t>())) {
-				addSodaCop(copId.get<uint32_t>());
+			// Add the SODA COPS!!!
+			sodaCops.clear();
+			if (j.contains("cops") && j["cops"].is_array()) {
+				for (auto& copId : j["cops"]) {
+					if (copId.is_number_unsigned() && !isSodaCop(copId.get<uint32_t>())) {
+						addSodaCop(copId.get<uint32_t>());
+					}
+				}
 			}
-		}
 
-		// Has the version changed?
-		if (version != update.version) {
-			return true;
-		} else {
+			// Has the version changed?
+			return version != update.version;
+
+		} catch (json::exception &) {
 			return false;
 		}
-
-		return false;
-
 	}
 
 	return false;
@@ -519,5 +521,3 @@ void Cache::addGlobalBan(uint32_t userId) {
 bool Cache::isGlobalBanned(uint32_t userId) {
     return std::find(globalBans.begin(), globalBans.end(), userId) != globalBans.end();
 }
-
-
