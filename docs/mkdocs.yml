@@ -1,0 +1,68 @@
+site_name: "Smash Soda Documentation"
+site_url: ""
+docs_dir: content
+site_dir: site
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/install.md
+    - Overview: getting-started/overview.md
+    - Quickstart: getting-started/quickstart.md
+    - Migration: getting-started/migration.md
+  - Widgets:
+    - Audio: widgets/Audio.md
+    - Button Lock: widgets/ButtonLock.md
+    - Chat: widgets/Chat.md
+    - Gamepads: widgets/Gamepads.md
+    - Guests: widgets/Guests.md
+    - Hosting: widgets/Hosting.md
+    - Hotseat: widgets/Hotseat.md
+    - Keyboard Mapper: widgets/KeyboardMapper.md
+    - Library: widgets/Library.md
+    - Log: widgets/Log.md
+    - Puppeteer: widgets/Puppeteer.md
+    - Settings: widgets/Settings.md
+    - Video: widgets/Video.md
+  - Features:
+    - Chat Commands: features/ChatCommands.md
+    - Sound Effects: features/SFX.md
+  - Overlay:
+    - Overview: overlay/Overview.md
+  - Studio:
+    - Overview: studio/Overview.md
+
+theme:
+  name: material
+  logo: img/logo.png
+  palette:
+    scheme: slate     # dark theme
+    primary: deep-orange
+    accent: deep-orange
+  font:
+    text: Roboto
+    code: Roboto Mono
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+    - search.highlight
+    - search.suggest
+
+plugins:
+  - search
+  - offline   # Material's built-in offline plugin
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - admonition
+  - codehilite:
+      guess_lang: false
+  - pymdownx.superfences
+  - pymdownx.tabbed
+
+extra_css:
+  - css/fixes.css

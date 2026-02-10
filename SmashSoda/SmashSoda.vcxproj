@@ -1,0 +1,499 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{b1691bdb-e677-4d65-aeaa-cd51f7aa8b17}</ProjectGuid>
+    <RootNamespace>SmashSoda</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>SmashSoda</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>C:\SDK\cplusplus\asio-1.24.0\include;$(IncludePath)</IncludePath>
+    <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(SolutionDir)external;$(SolutionDir)Dependencies\parsecsdk;$(SolutionDir)Dependencies\matoya;$(SolutionDir)Dependencies\vigem\include;$(SolutionDir)Dependencies\sdl\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(SolutionDir)Dependencies\parsecsdk\windows;$(SolutionDir)Dependencies\matoya\32;$(SolutionDir)Dependencies\vigem\lib\debug\x86;$(SolutionDir)Dependencies\sdl\lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>parsec32.lib;libucrtd.lib;matoya.lib;Winhttp.lib;Crypt32.lib;Secur32.lib;libvcruntime.lib;libucrt.lib;libcmt.lib;kernel32.lib;gdi32.lib;winmm.lib;imm32.lib;shell32.lib;advapi32.lib;ole32.lib;oleaut32.lib;opengl32.lib;user32.lib;uuid.lib;version.lib;setupapi.lib;hid.lib;dxgi.lib;ws2_32.lib;bcrypt.lib;windowscodecs.lib;xinput9_1_0.lib;d3d9.lib;shlwapi.lib;d3d11.lib;ViGEmClient.lib;SDL2.lib;SDL2main.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(SolutionDir)external;$(SolutionDir)Dependencies\parsecsdk;$(SolutionDir)Dependencies\matoya;$(SolutionDir)Dependencies\vigem\include;$(SolutionDir)Dependencies\sdl\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(SolutionDir)Dependencies\parsecsdk\windows;$(SolutionDir)Dependencies\matoya\32;$(SolutionDir)Dependencies\vigem\bin\release32;$(SolutionDir)Dependencies\sdl\lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>parsec32.lib;libucrt.lib;matoya.lib;Winhttp.lib;Crypt32.lib;Secur32.lib;libvcruntime.lib;libcmt.lib;kernel32.lib;gdi32.lib;winmm.lib;imm32.lib;shell32.lib;advapi32.lib;ole32.lib;oleaut32.lib;opengl32.lib;user32.lib;uuid.lib;version.lib;setupapi.lib;hid.lib;dxgi.lib;ws2_32.lib;bcrypt.lib;windowscodecs.lib;xinput9_1_0.lib;d3d9.lib;shlwapi.lib;d3d11.lib;ViGEmClient.lib;SDL2.lib;SDL2main.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>xcopy "$(SolutionDir)SmashSoda\fonts\" "$(TargetDir)fonts\" /E /Y
+xcopy "$(SolutionDir)SmashSoda\icons\" "$(TargetDir)icons\" /E /Y
+xcopy "$(SolutionDir)SmashSoda\sfx\" "$(TargetDir)sfx\" /E
+xcopy "$(SolutionDir)SmashSoda\themes\" "$(TargetDir)themes\" /E
+xcopy "$(SolutionDir)SmashSoda\plugins\" "$(TargetDir)plugins\" /E
+xcopy "$(SolutionDir)SmashSoda\overlay\" "$(TargetDir)overlay\" /E
+copy /Y "$(SolutionDir)Dependencies\parsecsdk\windows\parsec32.dll" "$(TargetDir)parsec32.dll"
+copy /Y "$(SolutionDir)Dependencies\sdl\lib\x86\SDL2.dll" "$(TargetDir)SDL2.dll"</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(SolutionDir)external;$(SolutionDir)Dependencies\parsecsdk;$(SolutionDir)Dependencies\matoya;$(SolutionDir)Dependencies\vigem\include;$(SolutionDir)Dependencies\sdl\include;$(SolutionDir)SmashSoda\chatbot;$(SolutionDir)SmashSoda\common;$(SolutionDir)SmashSoda\controllers;$(SolutionDir)SmashSoda\core;$(SolutionDir)SmashSoda\fonts;$(SolutionDir)SmashSoda\helpers;$(SolutionDir)SmashSoda\icons;$(SolutionDir)SmashSoda\imgui;$(SolutionDir)SmashSoda\lists;$(SolutionDir)SmashSoda\models;$(SolutionDir)SmashSoda\sfx;$(SolutionDir)SmashSoda\widgets;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalOptions>/bigobj /wd4244 /wd4267 /wd4101 %(AdditionalOptions)</AdditionalOptions>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(SolutionDir)Dependencies\parsecsdk\windows;$(SolutionDir)Dependencies\matoya\64;$(SolutionDir)Dependencies\vigem\lib\debug\x64;$(SolutionDir)Dependencies\sdl\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>parsec.lib;libucrtd.lib;matoya.lib;Winhttp.lib;Crypt32.lib;Secur32.lib;libvcruntime.lib;libucrt.lib;libcmt.lib;kernel32.lib;gdi32.lib;winmm.lib;imm32.lib;shell32.lib;advapi32.lib;ole32.lib;oleaut32.lib;opengl32.lib;user32.lib;uuid.lib;version.lib;setupapi.lib;hid.lib;dxgi.lib;ws2_32.lib;bcrypt.lib;windowscodecs.lib;xinput9_1_0.lib;d3d9.lib;shlwapi.lib;d3d11.lib;ViGEmClient.lib;SDL2.lib;SDL2main.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(SolutionDir)external;$(SolutionDir)Dependencies\parsecsdk;$(SolutionDir)Dependencies\matoya;$(SolutionDir)Dependencies\vigem\include;$(SolutionDir)Dependencies\sdl\include;$(SolutionDir)SmashSoda\chatbot;$(SolutionDir)SmashSoda\common;$(SolutionDir)SmashSoda\controllers;$(SolutionDir)SmashSoda\core;$(SolutionDir)SmashSoda\fonts;$(SolutionDir)SmashSoda\helpers;$(SolutionDir)SmashSoda\icons;$(SolutionDir)SmashSoda\imgui;$(SolutionDir)SmashSoda\lists;$(SolutionDir)SmashSoda\models;$(SolutionDir)SmashSoda\sfx;$(SolutionDir)SmashSoda\widgets;$(SolutionDir)SmashSoda\structs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>/bigobj /wd4244 /wd4267 /wd4101 %(AdditionalOptions)</AdditionalOptions>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <LanguageStandard>Default</LanguageStandard>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(SolutionDir)Dependencies\parsecsdk\windows;$(SolutionDir)Dependencies\matoya\64;$(SolutionDir)Dependencies\vigem\lib\release\x64;$(SolutionDir)Dependencies\sdl\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>parsec.lib;libucrt.lib;matoya.lib;Winhttp.lib;Crypt32.lib;Secur32.lib;libvcruntime.lib;libcmt.lib;kernel32.lib;gdi32.lib;winmm.lib;imm32.lib;shell32.lib;advapi32.lib;ole32.lib;oleaut32.lib;opengl32.lib;user32.lib;uuid.lib;version.lib;setupapi.lib;hid.lib;dxgi.lib;ws2_32.lib;bcrypt.lib;windowscodecs.lib;xinput9_1_0.lib;d3d9.lib;shlwapi.lib;d3d11.lib;ViGEmClient.lib;SDL2.lib;SDL2main.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+    </Link>
+    <PostBuildEvent>
+      <Command>xcopy "$(SolutionDir)SmashSoda\fonts\" "$(TargetDir)fonts\" /E /Y
+xcopy "$(SolutionDir)SmashSoda\icons\" "$(TargetDir)icons\" /E /Y
+xcopy "$(SolutionDir)SmashSoda\sfx\" "$(TargetDir)sfx\" /E
+xcopy "$(SolutionDir)SmashSoda\themes\" "$(TargetDir)themes\" /E
+xcopy "$(SolutionDir)SmashSoda\plugins\" "$(TargetDir)plugins\" /E
+xcopy "$(SolutionDir)SmashSoda\overlay\" "$(TargetDir)overlay\" /E
+copy /Y "$(SolutionDir)Dependencies\parsecsdk\windows\parsec.dll" "$(TargetDir)parsec.dll"
+copy /Y "$(SolutionDir)Dependencies\sdl\lib\x64\SDL2.dll" "$(TargetDir)SDL2.dll"</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="AudioSource.cpp" />
+    <ClCompile Include="Chatbot\ChatBot.cpp" />
+    <ClCompile Include="Chatbot\ChatBotCustom.cpp" />
+    <ClCompile Include="Chatbot\Commands\Guest\CommandBonk.cpp" />
+    <ClCompile Include="controllers\StreamHandler.cpp" />
+    <ClCompile Include="Core\Cache.cpp" />
+    <ClCompile Include="GameData.cpp" />
+    <ClCompile Include="ImGui\implot.cpp" />
+    <ClCompile Include="ImGui\implot_demo.cpp" />
+    <ClCompile Include="ImGui\implot_items.cpp" />
+    <ClCompile Include="Lists\GameDataList.cpp" />
+    <ClCompile Include="Helpers\PathHelper.cpp" />
+    <ClCompile Include="Helpers\StopwatchTimer.cpp" />
+    <ClCompile Include="KeyboardMapsUtil.cpp" />
+    <ClCompile Include="Core\Config.cpp" />
+    <ClCompile Include="Lists\ModList.cpp" />
+    <ClCompile Include="DualshockGamepad.cpp" />
+    <ClCompile Include="GamepadState.cpp" />
+    <ClCompile Include="controllers\Arcade.cpp" />
+    <ClCompile Include="controllers\AutoMod.cpp" />
+    <ClCompile Include="controllers\Hotseat.cpp" />
+    <ClCompile Include="controllers\Macro.cpp" />
+    <ClCompile Include="controllers\ProcessMan.cpp" />
+    <ClCompile Include="Lists\VerifiedList.cpp" />
+    <ClCompile Include="Lists\VIPList.cpp" />
+    <ClCompile Include="controllers\WebSocket.cpp" />
+    <ClCompile Include="widgets\BackgroundWidget.cpp" />
+    <ClCompile Include="Widgets\ButtonLockWidget.cpp" />
+    <ClCompile Include="Widgets\DeveloperWidget.cpp" />
+    <ClCompile Include="Widgets\HotseatWidget.cpp" />
+    <ClCompile Include="Widgets\KeyboardMapWidget.cpp" />
+    <ClCompile Include="Widgets\LibraryWidget.cpp" />
+    <ClCompile Include="Widgets\OverlayWidget.cpp" />
+    <ClCompile Include="Widgets\PopupWidgetEdit.cpp" />
+    <ClCompile Include="Widgets\SettingsWidget.cpp" />
+    <ClCompile Include="widgets\StreamingWidget.cpp" />
+    <ClCompile Include="widgets\Widget.cpp" />
+    <ClCompile Include="XBoxGamepad.cpp" />
+    <ClCompile Include="MasterOfPuppets.cpp" />
+    <ClCompile Include="SDLGamepad.cpp" />
+    <ClCompile Include="SDLGamepadReader.cpp" />
+    <ClCompile Include="Widgets\VirtualGamepadWidget.cpp" />
+    <ClCompile Include="XInputReader.cpp" />
+    <ClCompile Include="Widgets\MasterOfPuppetsWidget.cpp" />
+    <ClCompile Include="Helpers\Clock.cpp" />
+    <ClCompile Include="Helpers\Debouncer.cpp" />
+    <ClCompile Include="Helpers\Stopwatch.cpp" />
+    <ClCompile Include="Helpers\Timespan.cpp" />
+    <ClCompile Include="Widgets\Vec2.cpp" />
+    <ClCompile Include="Widgets\ProgressCircularWidget.cpp" />
+    <ClCompile Include="Widgets\AnimatedGamepadWidget.cpp" />
+    <ClCompile Include="Widgets\VideoWidget.cpp" />
+    <ClCompile Include="Widgets\VersionWidget.cpp" />
+    <ClCompile Include="Widgets\InfoWidget.cpp" />
+    <ClCompile Include="Frequency.cpp" />
+    <ClCompile Include="Globals\AppColors.cpp" />
+    <ClCompile Include="Globals\AppIcons.cpp" />
+    <ClCompile Include="Globals\AppStyle.cpp" />
+    <ClCompile Include="AudioIn.cpp" />
+    <ClCompile Include="AudioMix.cpp" />
+    <ClCompile Include="AudioOut.cpp" />
+    <ClCompile Include="Lists\BanList.cpp" />
+    <ClCompile Include="Helpers\Bitwise.cpp" />
+    <ClCompile Include="ChatLog.cpp" />
+    <ClCompile Include="Lists\TierList.cpp" />
+    <ClCompile Include="Widgets\HostInfoWidget.cpp" />
+    <ClCompile Include="GuestDataList.cpp" />
+    <ClCompile Include="Widgets\AudioSettingsWidget.cpp" />
+    <ClCompile Include="Widgets\AlertWidget.cpp" />
+    <ClCompile Include="Widgets\LoadingRingWidget.cpp" />
+    <ClCompile Include="Widgets\LoginWidget.cpp" />
+    <ClCompile Include="Lists\SFXList.cpp" />
+    <ClCompile Include="Widgets\AudioControlWidget.cpp" />
+    <ClCompile Include="GuestDevice.cpp" />
+    <ClCompile Include="Widgets\BoolButtonWidget.cpp" />
+    <ClCompile Include="Widgets\IntRangeWidget.cpp" />
+    <ClCompile Include="Widgets\TitleTooltipWidget.cpp" />
+    <ClCompile Include="Widgets\StylePickerWidget.cpp" />
+    <ClCompile Include="Widgets\IconButton.cpp" />
+    <ClCompile Include="Widgets\GamepadsWidget.cpp" />
+    <ClCompile Include="Widgets\GuestListWidget.cpp" />
+    <ClCompile Include="Widgets\LogWidget.cpp" />
+    <ClCompile Include="Widgets\ConfirmPopupWidget.cpp" />
+    <ClCompile Include="Helpers\Dice.cpp" />
+    <ClCompile Include="DX11.cpp" />
+    <ClCompile Include="Globals\AppFonts.cpp" />
+    <ClCompile Include="Widgets\TooltipWidget.cpp" />
+    <ClCompile Include="Widgets\ChatWidget.cpp" />
+    <ClCompile Include="AGamepad.cpp" />
+    <ClCompile Include="GamepadClient.cpp" />
+    <ClCompile Include="Guest.cpp" />
+    <ClCompile Include="Models\GuestData.cpp" />
+    <ClCompile Include="GuestList.cpp" />
+    <ClCompile Include="Hosting.cpp" />
+    <ClCompile Include="Texture.cpp" />
+    <ClCompile Include="Widgets\HostSettingsWidget.cpp" />
+    <ClCompile Include="ImGui\imgui.cpp" />
+    <ClCompile Include="ImGui\imgui_demo.cpp" />
+    <ClCompile Include="ImGui\imgui_draw.cpp" />
+    <ClCompile Include="ImGui\imgui_impl_dx11.cpp" />
+    <ClCompile Include="ImGui\imgui_impl_win32.cpp" />
+    <ClCompile Include="ImGui\imgui_tables.cpp" />
+    <ClCompile Include="ImGui\imgui_widgets.cpp" />
+    <ClCompile Include="Main.cpp" />
+    <ClCompile Include="ParsecSession.cpp" />
+    <ClCompile Include="StressTest.cpp" />
+    <ClCompile Include="Helpers\Stringer.cpp" />
+    <ClCompile Include="Widgets\ToggleIconButtonWidget.cpp" />
+    <ClCompile Include="Helpers\Utils.cpp" />
+    <ClCompile Include="Widgets\NavBar.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="AudioSource.h" />
+    <ClInclude Include="ButtonLock.h" />
+    <ClInclude Include="Chatbot\ChatBotCustom.h" />
+    <ClInclude Include="Chatbot\Commands\CommandBotMessage.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\Command8Ball.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandDC.h" />
+    <ClInclude Include="Chatbot\Commands\CommandDefaultMessage.h" />
+    <ClInclude Include="Chatbot\Commands\God\CommandVersion.h" />
+    <ClInclude Include="Chatbot\Commands\God\CommandAddPS.h" />
+    <ClInclude Include="Chatbot\Commands\God\CommandAddXbox.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandBB.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandFF.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandDCAll.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandDecrease.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandDiscord.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandExtend.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandCooldown.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandFortune.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandHotseat.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandKeyboard.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandKick.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandLock.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandLockAll.h" />
+    <ClInclude Include="Chatbot\Commands\God\CommandMod.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandMute.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandPing.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandRollCall.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandRC.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandRestart.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandRPG.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandSpectate.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandStripAll.h" />
+    <ClInclude Include="Chatbot\Commands\CommandTemplate.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandTriangle.h" />
+    <ClInclude Include="Chatbot\Commands\God\CommandUnmod.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandUnban.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandUnbanLastIP.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandUnmute.h" />
+    <ClInclude Include="Chatbot\Commands\God\CommandUnVIP.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandVerify.h" />
+    <ClInclude Include="Chatbot\Commands\God\CommandVIP.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandWarmup.h" />
+    <ClInclude Include="controllers\StreamHandler.h" />
+    <ClInclude Include="Core\Cache.h" />
+    <ClInclude Include="GameData.h" />
+    <ClInclude Include="Helpers\Countries.h" />
+    <ClInclude Include="Helpers\Keymap.h" />
+    <ClInclude Include="ImGui\implot.h" />
+    <ClInclude Include="ImGui\implot_internal.h" />
+    <ClInclude Include="Lists\GameDataList.h" />
+    <ClInclude Include="Helpers\PathHelper.h" />
+    <ClInclude Include="Helpers\StopwatchTimer.h" />
+    <ClInclude Include="ImGui\imform.h" />
+    <ClInclude Include="KeyboardMapsUtil.h" />
+    <ClInclude Include="Core\Config.h" />
+    <ClInclude Include="Models\CommandInfo.h" />
+    <ClInclude Include="controllers\Arcade.h" />
+    <ClInclude Include="controllers\AutoMod.h" />
+    <ClInclude Include="controllers\Hotseat.h" />
+    <ClInclude Include="controllers\Macro.h" />
+    <ClInclude Include="Helpers\TimeT.h" />
+    <ClInclude Include="Lists\ModList.h" />
+    <ClInclude Include="DualshockGamepad.h" />
+    <ClInclude Include="GamepadState.h" />
+    <ClInclude Include="controllers\ProcessMan.h" />
+    <ClInclude Include="Lists\VerifiedList.h" />
+    <ClInclude Include="Lists\VIPList.h" />
+    <ClInclude Include="controllers\WebSocket.h" />
+    <ClInclude Include="structs\IPRangeStruct.h" />
+    <ClInclude Include="widgets\BackgroundWidget.h" />
+    <ClInclude Include="Widgets\ButtonLockWidget.h" />
+    <ClInclude Include="Widgets\DeveloperWidget.h" />
+    <ClInclude Include="Widgets\HotseatWidget.h" />
+    <ClInclude Include="Widgets\KeyboardMapWidget.h" />
+    <ClInclude Include="Widgets\LibraryWidget.h" />
+    <ClInclude Include="Widgets\OverlayWidget.h" />
+    <ClInclude Include="Widgets\PopupWidgetEdit.h" />
+    <ClInclude Include="Widgets\SettingsWidget.h" />
+    <ClInclude Include="widgets\StreamingWidget.h" />
+    <ClInclude Include="widgets\Widget.h" />
+    <ClInclude Include="XBoxGamepad.h" />
+    <ClInclude Include="MasterOfPuppets.h" />
+    <ClInclude Include="SDLGamepad.h" />
+    <ClInclude Include="SDLGamepadReader.h" />
+    <ClInclude Include="Widgets\VirtualGamepadWidget.h" />
+    <ClInclude Include="XInputReader.h" />
+    <ClInclude Include="IGamepadReader.h" />
+    <ClInclude Include="Widgets\MasterOfPuppetsWidget.h" />
+    <ClInclude Include="AudioTools.h" />
+    <ClInclude Include="Helpers\Clock.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandSFX.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandOne.h" />
+    <ClInclude Include="CompilerDirectives.h" />
+    <ClInclude Include="Helpers\Debouncer.h" />
+    <ClInclude Include="Helpers\Stopwatch.h" />
+    <ClInclude Include="Helpers\Timespan.h" />
+    <ClInclude Include="Widgets\Vec2.h" />
+    <ClInclude Include="Widgets\ProgressCircularWidget.h" />
+    <ClInclude Include="Widgets\AnimatedGamepadWidget.h" />
+    <ClInclude Include="Widgets\VideoWidget.h" />
+    <ClInclude Include="Widgets\VersionWidget.h" />
+    <ClInclude Include="Widgets\InfoWidget.h" />
+    <ClInclude Include="Frequency.h" />
+    <ClInclude Include="Globals\AppColors.h" />
+    <ClInclude Include="Globals\AppIcons.h" />
+    <ClInclude Include="Globals\AppStyle.h" />
+    <ClInclude Include="Helpers\Bitwise.h" />
+    <ClInclude Include="ChatLog.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandStrip.h" />
+    <ClInclude Include="GuestTier.h" />
+    <ClInclude Include="Tier.h" />
+    <ClInclude Include="Lists\TierList.h" />
+    <ClInclude Include="Widgets\HostInfoWidget.h" />
+    <ClInclude Include="GuestDataList.h" />
+    <ClInclude Include="Widgets\AudioSettingsWidget.h" />
+    <ClInclude Include="Widgets\AlertWidget.h" />
+    <ClInclude Include="Widgets\LoadingRingWidget.h" />
+    <ClInclude Include="Widgets\LoginWidget.h" />
+    <ClInclude Include="Lists\SFXList.h" />
+    <ClInclude Include="Widgets\AudioControlWidget.h" />
+    <ClInclude Include="GuestDevice.h" />
+    <ClInclude Include="Widgets\BoolButtonWidget.h" />
+    <ClInclude Include="Widgets\IntRangeWidget.h" />
+    <ClInclude Include="Widgets\TitleTooltipWidget.h" />
+    <ClInclude Include="Widgets\StylePickerWidget.h" />
+    <ClInclude Include="Widgets\IconButton.h" />
+    <ClInclude Include="Widgets\GamepadsWidget.h" />
+    <ClInclude Include="Widgets\GuestListWidget.h" />
+    <ClInclude Include="Widgets\LogWidget.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandSwap.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandPads.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandMirror.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandBan.h" />
+    <ClInclude Include="AudioIn.h" />
+    <ClInclude Include="AudioMix.h" />
+    <ClInclude Include="AudioOut.h" />
+    <ClInclude Include="Lists\BanList.h" />
+    <ClInclude Include="Chatbot\ChatBot.h" />
+    <ClInclude Include="Chatbot\Commands\God\CommandPublic.h" />
+    <ClInclude Include="Chatbot\Commands\God\CommandSpeakers.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandName.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandBonk.h" />
+    <ClInclude Include="Chatbot\Commands\God\CommandQuit.h" />
+    <ClInclude Include="Chatbot\ACommand.h" />
+    <ClInclude Include="Chatbot\Commands\Guest\CommandHelp.h" />
+    <ClInclude Include="Chatbot\Commands\Mod\CommandVideoFix.h" />
+    <ClInclude Include="Chatbot\Commands\God\CommandPrivate.h" />
+    <ClInclude Include="Globals\AppFonts.h" />
+    <ClInclude Include="Widgets\ConfirmPopupWidget.h" />
+    <ClInclude Include="Widgets\TooltipWidget.h" />
+    <ClInclude Include="Widgets\ChatWidget.h" />
+    <ClInclude Include="Guest.h" />
+    <ClInclude Include="GuestList.h" />
+    <ClInclude Include="Hosting.h" />
+    <ClInclude Include="Texture.h" />
+    <ClInclude Include="Widgets\HostSettingsWidget.h" />
+    <ClInclude Include="ImGui\imconfig.h" />
+    <ClInclude Include="ImGui\imgui.h" />
+    <ClInclude Include="ImGui\imgui_colors.h" />
+    <ClInclude Include="ImGui\imgui_impl_dx11.h" />
+    <ClInclude Include="ImGui\imgui_impl_win32.h" />
+    <ClInclude Include="ImGui\imgui_internal.h" />
+    <ClInclude Include="ImGui\imstb_rectpack.h" />
+    <ClInclude Include="ImGui\imstb_textedit.h" />
+    <ClInclude Include="ImGui\imstb_truetype.h" />
+    <ClInclude Include="KeyboardMaps.h" />
+    <ClInclude Include="Helpers\Dice.h" />
+    <ClInclude Include="DX11.h" />
+    <ClInclude Include="AGamepad.h" />
+    <ClInclude Include="GamepadClient.h" />
+    <ClInclude Include="Models\GuestData.h" />
+    <ClInclude Include="ParsecSession.h" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="stb_image.h" />
+    <ClInclude Include="StressTest.h" />
+    <ClInclude Include="Helpers\Stringer.h" />
+    <ClInclude Include="Widgets\ToggleIconButtonWidget.h" />
+    <ClInclude Include="Helpers\Utils.h" />
+    <ClInclude Include="Widgets\NavBar.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Resource.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\x64\Debug\icon.ico" />
+    <Image Include="icon.ico" />
+    <Image Include="icon1.ico" />
+    <Image Include="icon2.ico" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>

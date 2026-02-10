@@ -1,0 +1,23 @@
+{
+  "name": "parsec-sdk-ts",
+  "version": "1.0.0",
+  "description": "TypeScript wrapper for the Parsec SDK",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "parsec",
+    "sdk"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ffi-napi": "git+https://github.com/node-ffi-napi/ffi-napi.git",
+    "ref-napi": "git+https://github.com/node-ffi-napi/ref-napi.git",
+    "ref-struct-di": "git+https://github.com/node-ffi-napi/ref-struct-di.git"
+  },
+  "devDependencies": {
+    "@types/node": "^18.11.18"
+  }
+}
