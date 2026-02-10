@@ -63,10 +63,10 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/structs"
     "${CMAKE_CURRENT_SOURCE_DIR}/widgets"
     "${CMAKE_CURRENT_SOURCE_DIR}/../external"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../dependencies/parsecsdk"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../dependencies/matoya"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../dependencies/vigem/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../dependencies/sdl/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../Dependencies/parsecsdk"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../Dependencies/matoya"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../Dependencies/vigem/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../Dependencies/sdl/include"
 )
 
 # --------------------------
