@@ -1,4 +1,6 @@
-﻿#include "VersionWidget.h"
+#include "VersionWidget.h"
+#include <Windows.h>
+#include <shellapi.h>
 
 // Constructor
 VersionWidget::VersionWidget() {
@@ -307,14 +309,44 @@ bool VersionWidget::renderUpdateWindow() {
     ImGui::Spacing();
 
     AppColors::pushButtonSolid();
-    
-    // if (!Cache::cache.update.critical) {
-    //     ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.5f - 50);
-    //     if (ImGui::Button("Close")) {
-    //         showUpdate = false;
-    //     }
-    //     AppColors::popButton();
-    // }
+
+    bool startUpdate = false;
+    static std::string updateError = "";
+
+    ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.5f - 45);
+    if (ImGui::Button("Update Now")) {
+        updateError = "";
+
+        char exePath[MAX_PATH] = {};
+        GetModuleFileNameA(NULL, exePath, MAX_PATH);
+
+        std::string appDir = exePath;
+        size_t sep = appDir.find_last_of("\\/");
+        if (sep != std::string::npos) {
+            appDir = appDir.substr(0, sep);
+            std::string updaterPath = appDir + "\\updater.bat";
+
+            if (MTY_FileExists(updaterPath.c_str())) {
+                HINSTANCE launched = ShellExecuteA(NULL, "open", updaterPath.c_str(), NULL, appDir.c_str(), SW_SHOWDEFAULT);
+                if ((INT_PTR)launched > 32) {
+                    startUpdate = true;
+                } else {
+                    updateError = "Failed to start updater.bat";
+                }
+            } else {
+                updateError = "updater.bat not found next to SmashSoda.exe";
+            }
+        } else {
+            updateError = "Could not resolve app folder";
+        }
+    }
+
+    if (!updateError.empty()) {
+        ImGui::Spacing();
+        ImGui::PushStyleColor(ImGuiCol_Text, AppColors::negative);
+        ImGui::TextWrapped("%s", updateError.c_str());
+        ImGui::PopStyleColor();
+    }
 
     ImGui::PopStyleColor();
     ImGui::PopFont();
@@ -322,7 +354,7 @@ bool VersionWidget::renderUpdateWindow() {
     ImGui::PopStyleColor();
     ImGui::PopFont();
 
-    return true;
+    return startUpdate;
 
 }
 

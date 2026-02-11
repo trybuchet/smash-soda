@@ -81,6 +81,7 @@ ID3D11ShaderResourceView* AppIcons::tournament;
 ID3D11ShaderResourceView* AppIcons::crown;
 ID3D11ShaderResourceView* AppIcons::star;
 ID3D11ShaderResourceView* AppIcons::eye;
+ID3D11ShaderResourceView* AppIcons::mouse;
 
 ID3D11ShaderResourceView* AppIcons::developer;
 
@@ -174,6 +175,7 @@ Texture AppIcons::_developer;
 Texture AppIcons::_crown;
 Texture AppIcons::_star;
 Texture AppIcons::_eye;
+Texture AppIcons::_mouse;
 
 Texture AppIcons::_sodaArcadeLogo;
 
@@ -265,6 +267,7 @@ void AppIcons::init(ID3D11Device* pd3dDevice)
 	_crown.loadFromFile(pd3dDevice, "./icons/crown.png");
 	_star.loadFromFile(pd3dDevice, "./icons/star.png");
 	_eye.loadFromFile(pd3dDevice, "./icons/eye.png");
+    _mouse.loadFromFile(pd3dDevice, "./icons/mouse.png");
 
     _developer.loadFromFile(pd3dDevice, "./icons/developer.png");
 
@@ -356,6 +359,7 @@ void AppIcons::init(ID3D11Device* pd3dDevice)
 	crown = _crown.texture;
 	star = _star.texture;
 	eye = _eye.texture;
+    mouse = _mouse.texture;
 
 	developer = _developer.texture;
 

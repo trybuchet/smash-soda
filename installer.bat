@@ -2,6 +2,33 @@
 setlocal EnableExtensions EnableDelayedExpansion
 title Smash Soda Installer
 
+:: --------- Admin check ----------
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+  echo.
+  echo ERROR: This installer must be run as Administrator.
+  echo Attempting to relaunch with admin permissions...
+  echo If you see a User Account Control prompt, click Yes.
+  echo.
+  if not defined SS_ELEVATED (
+    set "SS_ELEVATED=1"
+    if "%~1"=="" (
+      %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass ^
+        -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+    ) else (
+      %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass ^
+        -Command "Start-Process -FilePath '%~f0' -Verb RunAs -ArgumentList '%*'"
+    )
+    timeout /t 5 >nul
+    exit /b 1
+  ) else (
+    echo UAC was cancelled or elevation failed.
+    echo Please right-click the installer and choose "Run as administrator".
+    echo.
+    pause >nul
+  )
+)
+
 echo.
 echo ==========================================================
 echo Smash Soda Installer
@@ -14,6 +41,9 @@ echo This installer will download build tools and compile
 echo Smash Soda from source (required due to SDK licensing).
 echo.
 echo Recommended free disk space: at least 15 GB.
+echo.
+echo Sometimes the installer can go to sleep, click the window
+echo or press a key if it shows no activity.
 echo ==========================================================
 echo.
 echo Press any key to continue...
@@ -270,14 +300,13 @@ echo CMake is ready.
 
 :: --------- ViGEmBus driver ----------
 echo.
-echo [4/8] ViGEmBus driver (skipped - commented out in original script)
-:: Uncomment below if you need ViGEmBus driver
-@REM call :download "%VIGEMBUS_URL%" "%VIGEMBUS_SETUP%" "ViGEmBus Driver"
-@REM if not exist "%VIGEMBUS_SETUP%" (
-@REM   echo ERROR: ViGEmBus installer was not downloaded.
-@REM   exit /b 1
-@REM )
-@REM "%VIGEMBUS_SETUP%" /qn
+echo [4/8] ViGEmBus driver 
+call :download "%VIGEMBUS_URL%" "%VIGEMBUS_SETUP%" "ViGEmBus Driver"
+if not exist "%VIGEMBUS_SETUP%" (
+  echo ERROR: ViGEmBus installer was not downloaded.
+  exit /b 1
+)
+"%VIGEMBUS_SETUP%" /qn
 
 :: --------- Clone source ----------
 echo.

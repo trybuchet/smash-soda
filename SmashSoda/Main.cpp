@@ -285,7 +285,9 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
 
         versionWidget.render();
         if (versionWidget.showUpdate) {
-            versionWidget.renderUpdateWindow();
+            if (versionWidget.renderUpdateWindow()) {
+                ::PostMessage(hwnd, WM_CLOSE, 0, 0);
+            }
         }
         else if (Config::cfg.arcade.showLogin) {
             versionWidget.renderLoginWindow();

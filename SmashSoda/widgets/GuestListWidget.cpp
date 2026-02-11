@@ -77,6 +77,9 @@ void GuestListWidget::renderOnlineGuests() {
         name = _guests[i].name;
         userID = _guests[i].userID;
 
+        bool allowMouseInput = _guests[i].allowMouseInput;
+        bool allowKeyboardInput = _guests[i].allowKeyboardInput;
+
         m = _hosting.getMetrics(_guests[i].id);
 
         filterTextStr = _filterText;
@@ -128,6 +131,16 @@ void GuestListWidget::renderOnlineGuests() {
         ImGui::SameLine();
         //ImGui::Image(AppIcons::userOn, ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1), theme->panelText);
 
+        if (allowMouseInput) {
+            ImGui::SameLine();
+            ImGui::Image(AppIcons::mouse, ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1), theme->panelText);
+        }
+
+        if (allowKeyboardInput) {
+            ImGui::SameLine();
+            ImGui::Image(AppIcons::keymap, ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1), theme->panelText);
+        }
+
         if (Cache::cache.modList.isModded(userID) || _hosting.getHost().userID == userID) {
             ImGui::SameLine();
             ImGui::Image(AppIcons::hammerIcon, ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1), theme->panelText);
@@ -172,12 +185,10 @@ void GuestListWidget::renderOnlineGuests() {
             ImGui::Dummy(ImVec2(0.0f, 10.0f));
             ImGui::PushStyleColor(ImGuiCol_Text, theme->panelText);
 
-            bool allowKeyboardInput = _guests[i].allowKeyboardInput;
             if (ImGui::MenuItem("Allow keyboard input", nullptr, allowKeyboardInput)) {
                 _hosting.setGuestInputPermissions(userID, !allowKeyboardInput, _guests[i].allowMouseInput);
             }
 
-            bool allowMouseInput = _guests[i].allowMouseInput;
             if (ImGui::MenuItem("Allow mouse input", nullptr, allowMouseInput)) {
                 _hosting.setGuestInputPermissions(userID, _guests[i].allowKeyboardInput, !allowMouseInput);
             }

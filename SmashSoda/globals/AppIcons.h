@@ -89,6 +89,7 @@ public:
 	static ID3D11ShaderResourceView* crown;
 	static ID3D11ShaderResourceView* star;
 	static ID3D11ShaderResourceView* eye;
+	static ID3D11ShaderResourceView* mouse;
 
 	static ID3D11ShaderResourceView* developer;
 
@@ -181,6 +182,7 @@ private:
 	static Texture _crown;
 	static Texture _star;
 	static Texture _eye;
+	static Texture _mouse;
 
 	static Texture _developer;
 
