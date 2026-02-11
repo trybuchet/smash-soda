@@ -14,7 +14,6 @@ void Config::Load() {
 	if (MTY_FileExists(configPath.c_str())) {
 
 		try {
-
 			size_t size;
 			void* data = MTY_ReadFile(configPath.c_str(), &size);
 
@@ -507,5 +506,3 @@ void Config::RemoveHotkey(int index) {
 		}
 	}
 }
-
-

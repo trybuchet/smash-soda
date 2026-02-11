@@ -7,6 +7,7 @@
 #include <shlobj.h>
 #include "matoya.h"
 #include <nlohmann/json.hpp>
+#include <vector>
 #include "PathHelper.h"
 #include "Keymap.h"
 
@@ -354,6 +355,7 @@ public:
 	void SetHotkey();
 	void AddHotkey(string command, int key);
 	void RemoveHotkey(int index);
+
 private:
 	void static LoadOverlayThemes();
 };

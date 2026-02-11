@@ -22,8 +22,8 @@ set(CMAKE_UNITY_BUILD ON)
 # --------------------------
 # Source and header files
 # --------------------------
-file(GLOB_RECURSE ALL_HEADERS "*.h" "*.hpp")
-file(GLOB_RECURSE ALL_SOURCES "*.cpp" "*.cxx" "*.cc")
+file(GLOB_RECURSE ALL_HEADERS CONFIGURE_DEPENDS "*.h" "*.hpp")
+file(GLOB_RECURSE ALL_SOURCES CONFIGURE_DEPENDS "*.cpp" "*.cxx" "*.cc")
 
 # Add resource file for app icon
 set(RESOURCE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/Resource.rc")

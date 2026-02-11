@@ -1,5 +1,7 @@
 #include "Hosting.h"
 #include "services/OverlayService.h"
+#include "services/InputControlService.h"
+#include "services/GuestStateStore.h"
 
 using namespace std;
 
@@ -63,6 +65,7 @@ void Hosting::init() {
 	
 	_parsecStatus = ParsecInit(NULL, NULL, (char *)SDK_PATH, &_parsec);
 	_dx11.init();
+	GuestStateStore::instance().load();
 	
 	// Apply saved resolution scaling setting
 	if (Config::cfg.video.resolutionIndex > 0 && Config::cfg.video.resolutionIndex < Config::cfg.resolutions.size()) {
@@ -321,6 +324,30 @@ vector<string>& Hosting::getCommandLog() {
  */
 vector<Guest>& Hosting::getGuests() {
 	return GuestList::instance.getGuests();
+}
+
+bool Hosting::setGuestInputPermissions(uint32_t userID, bool allowKeyboard, bool allowMouse) {
+	Guest guest;
+	if (!GuestList::instance.find(userID, &guest)) {
+		return false;
+	}
+
+	ParsecPermissions perms{};
+	perms.gamepad = guest.allowGamepadInput;
+	perms.keyboard = allowKeyboard;
+	perms.mouse = allowMouse;
+
+	const ParsecStatus status = ParsecHostSetPermissions(_parsec, guest.id, &perms);
+	GuestList::instance.setInputPermissions(userID, perms.gamepad, perms.keyboard, perms.mouse);
+
+	if (status != PARSEC_OK) {
+		logMessage("Failed to update SDK input permissions for " + guest.name + " (status " + to_string(status) + "). Using local permission state.");
+	}
+
+	GuestStateStore::instance().setGuestInputPermissions(userID, perms.gamepad, perms.keyboard, perms.mouse);
+	GuestStateStore::instance().save();
+
+	return status == PARSEC_OK;
 }
 
 /**
@@ -679,8 +706,7 @@ void Hosting::handleMessage(const char* message, Guest& guest, bool isHost, bool
 		return;
 	}
 
-	// Has the user been muted?
-	if (AutoMod::instance.isMuted(guest.userID)) {
+	if (!handleMuting(message, guest)) {
 		return;
 	}
 
@@ -743,10 +769,8 @@ void Hosting::handleMessage(const char* message, Guest& guest, bool isHost, bool
  * @return True if the operation was successful, false otherwise.
  */
 bool Hosting::handleMuting(const char* message, Guest& guest) {
-
-	// TODO: If muted, ignore message
-
-	return true;
+	(void)message;
+	return !AutoMod::instance.isMuted(guest.userID);
 
 }
 
@@ -1171,9 +1195,26 @@ void Hosting::pollInputs() {
 	{
 		if (ParsecHostPollInput(_parsec, 4, &inputGuest, &inputGuestMsg))
 		{
+			Guest guest;
+			if (GuestList::instance.find(inputGuest.userID, &guest)) {
+				if (inputGuestMsg.type == MESSAGE_KEYBOARD && !guest.allowKeyboardInput) {
+					continue;
+				}
+
+				if ((inputGuestMsg.type == MESSAGE_MOUSE_BUTTON ||
+					inputGuestMsg.type == MESSAGE_MOUSE_WHEEL ||
+					inputGuestMsg.type == MESSAGE_MOUSE_MOTION) &&
+					!guest.allowMouseInput) {
+					continue;
+				}
+			}
+
 			if (!GamepadClient::instance.lock)
 			{
-					GamepadClient::instance.sendMessage(inputGuest, inputGuestMsg);
+				const bool consumedByGamepad = GamepadClient::instance.sendMessage(inputGuest, inputGuestMsg);
+				if (!consumedByGamepad) {
+					InputControlService::instance().handleParsecMessage(inputGuestMsg);
+				}
 			}
 
 		}
@@ -1361,6 +1402,13 @@ void Hosting::processNewGuestConnection(Guest& guest) {
 	}
 	if (_host.userID == guest.userID) {
 		_tierList.setTier(guest.userID, Tier::GOD);
+	}
+
+	GuestStateStore::GuestPermissionState persistedPermissions;
+	if (GuestStateStore::instance().tryGetGuestInputPermissions(guest.userID, persistedPermissions)) {
+		if (guest.allowKeyboardInput != persistedPermissions.keyboard || guest.allowMouseInput != persistedPermissions.mouse) {
+			setGuestInputPermissions(guest.userID, persistedPermissions.keyboard, persistedPermissions.mouse);
+		}
 	}
 
 	// 3. Log Connection & Announce

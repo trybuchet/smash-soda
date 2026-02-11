@@ -41,7 +41,7 @@ public:
 			return false;
 		}
 
-		AutoMod::instance.UnmuteUser(target.id);
+		AutoMod::instance.UnmuteUser(target.userID);
 		setReply(target.name + " has been unmuted\0");
 
 		return true;

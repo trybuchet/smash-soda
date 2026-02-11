@@ -172,6 +172,18 @@ void GuestListWidget::renderOnlineGuests() {
             ImGui::Dummy(ImVec2(0.0f, 10.0f));
             ImGui::PushStyleColor(ImGuiCol_Text, theme->panelText);
 
+            bool allowKeyboardInput = _guests[i].allowKeyboardInput;
+            if (ImGui::MenuItem("Allow keyboard input", nullptr, allowKeyboardInput)) {
+                _hosting.setGuestInputPermissions(userID, !allowKeyboardInput, _guests[i].allowMouseInput);
+            }
+
+            bool allowMouseInput = _guests[i].allowMouseInput;
+            if (ImGui::MenuItem("Allow mouse input", nullptr, allowMouseInput)) {
+                _hosting.setGuestInputPermissions(userID, _guests[i].allowKeyboardInput, !allowMouseInput);
+            }
+
+            ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
             if (Cache::cache.vipList.isVIP(userID)) {
                 if (ImGui::Selectable("Revoke VIP Status")) {
                     Cache::cache.vipList.unVIP(userID);

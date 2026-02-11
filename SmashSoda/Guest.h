@@ -46,6 +46,9 @@ public:
 	Status status;
 	bool spectator;
 	bool fake;
+	bool allowGamepadInput;
+	bool allowKeyboardInput;
+	bool allowMouseInput;
 };
 
 

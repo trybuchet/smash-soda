@@ -43,6 +43,7 @@ private:
 	vector<string>& _chatLog;
 	size_t _messageCount;
 	function<void(void)> _onMessageCallback;
+	bool _focusSendInputNextFrame = true;
 };
 
 

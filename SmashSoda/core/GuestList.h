@@ -43,13 +43,14 @@ public:
 	void deleteMetrics(uint32_t id);
 	void updateMetrics(ParsecGuest* guests, int guestCount);
 	bool pop(uint32_t userID);
+	bool setInputPermissions(uint32_t userID, bool gamepad, bool keyboard, bool mouse);
 
 	const char* guestNames[GUESTLIST_MAX_GUESTS];
 private:
 	vector<Guest> _guests;
 	map<uint32_t, MyMetrics> _metrics;
+	map<uint32_t, ParsecPermissions> _inputPermissions;
 };
-
 
 
 

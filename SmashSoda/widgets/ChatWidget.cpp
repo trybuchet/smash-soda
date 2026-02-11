@@ -26,13 +26,11 @@ bool ChatWidget::render(bool& showWindow) {
             _chatLog.erase(it, it + CHATLOG_MESSAGE_LENGTH/2);
         }
 
-        static float chatLogScrollY = 0.0f;
-        static float chatLogScrollMaxY = 0.0f;
-        static bool chatLogScrollInit = false;
         ImGui::BeginChild("Chat Log", ImVec2(0, size.y - 85));
-        if (chatLogScrollInit && chatLogScrollMaxY > 0.0f) {
-            ImGui::SetScrollY(chatLogScrollY);
-        }
+        const float previousScrollY = ImGui::GetScrollY();
+        const float previousScrollMaxY = ImGui::GetScrollMaxY();
+        const bool wasNearBottom = previousScrollY >= (previousScrollMaxY - 10.0f);
+
         for (size_t i = 0; i < _chatLog.size(); ++i) {
             static float textHeight;
             cursor = ImGui::GetCursorPos();
@@ -50,7 +48,7 @@ bool ChatWidget::render(bool& showWindow) {
             }
         }
         if (_messageCount != _chatLog.size()) {
-            if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 100) {
+            if (wasNearBottom) {
                 ImGui::SetScrollHereY(1.0f);
             }
             _messageCount = _chatLog.size();
@@ -59,20 +57,17 @@ bool ChatWidget::render(bool& showWindow) {
                 _onMessageCallback();
             }
         }
-        float currentMaxY = ImGui::GetScrollMaxY();
-        if (currentMaxY > 0.0f) {
-            if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || ImGui::IsWindowHovered()) {
-                chatLogScrollMaxY = currentMaxY;
-                chatLogScrollY = ImGui::GetScrollY();
-                chatLogScrollInit = true;
-            }
-        }
         ImGui::EndChild();
 
     endBody();
 
     startFooter();
 	    ImGui::Dummy(ImVec2(10.0, .05f));
+
+        if (_focusSendInputNextFrame && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
+            ImGui::SetKeyboardFocusHere();
+            _focusSendInputNextFrame = false;
+        }
 
         try {
             strcpy_s(_lastBuffer, SEND_BUFFER_LEN, _sendBuffer);
@@ -339,6 +334,7 @@ void ChatWidget::sendMessage() {
     }
 
     setSendBuffer("\0");
+    _focusSendInputNextFrame = true;
 }
 
 bool ChatWidget::setSendBuffer(const char* value)

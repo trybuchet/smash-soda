@@ -3,6 +3,7 @@
 #include "../ImGui/imgui.h"
 #include "../Hosting.h"
 #include "../globals/AppIcons.h"
+#include "../ImGui/imform.h"
 #include "IconButton.h"
 #include "TitleTooltipWidget.h"
 #include "ConfirmPopupWidget.h"

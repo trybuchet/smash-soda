@@ -101,6 +101,8 @@ bool GamepadsWidget::render(bool& showWindow) {
             agws.push_back(new AnimatedGamepadWidget(true));
         }
 
+        ImGui::PushID(static_cast<int>(i));
+
         AnimatedGamepadWidget* agw = agws[i];
         AGamepad* gi = _gamepads[i];
 
@@ -340,6 +342,7 @@ bool GamepadsWidget::render(bool& showWindow) {
         ImGui::EndGroup();
         ImGui::Dummy(ImVec2(0, 10));
 
+        ImGui::PopID();
     }
 
     ImGui::Dummy(ImVec2(0, 20));

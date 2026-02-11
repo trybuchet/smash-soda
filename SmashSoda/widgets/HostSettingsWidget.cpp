@@ -161,6 +161,9 @@ bool HostSettingsWidget::render(bool& showWindow, HWND& hwnd) {
         }
     }
 
+    // Read only share link
+    elReadOnly("Share Link", _shareLink, "The link to share with your guests.");
+
     // Guest limit
     if (elNumber("Guest Slots", _maxGuests, 0, 20, "The maximum number of guests that can join your room.")) {
         Config::cfg.room.guestLimit = _maxGuests;

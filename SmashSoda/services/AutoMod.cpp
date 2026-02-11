@@ -131,7 +131,6 @@ void AutoMod::MuteUser(int userId, string userName, int duration) {
 	// Add the user to the muted list
 	mutedUsers.push_back(mutedUser);
 
-	// Log the mute
 	Log("Muted " + userName + " for " + to_string(duration) + " minutes.");
 
 }

@@ -79,6 +79,7 @@ public:
 	vector<string>& getMessageLog();
 	vector<string>& getCommandLog();
 	vector<Guest>& getGuests();
+	bool setGuestInputPermissions(uint32_t userID, bool allowKeyboard, bool allowMouse);
 	vector<Guest> getPlayingGuests();
 	vector<Guest> getRandomGuests();
 	Guest& getGuest(uint32_t id);
@@ -230,6 +231,5 @@ private:
 
 	const int _mickeyID = 1693946;
 };
-
 
 

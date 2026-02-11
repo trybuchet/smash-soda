@@ -11,21 +11,30 @@ void GuestList::setGuests(ParsecGuest* guests, int guestCount)
 
 	for (size_t i = 0; i < guestCount; i++)
 	{
-		_guests.push_back
-		(
-			Guest
-			(
-				guests[i].name,
-				guests[i].userID,
-				guests[i].id
-			)
-		);
+		Guest guest(guests[i]);
+
+		auto it = _inputPermissions.find(guest.userID);
+		if (it != _inputPermissions.end()) {
+			guest.allowGamepadInput = it->second.gamepad;
+			guest.allowKeyboardInput = it->second.keyboard;
+			guest.allowMouseInput = it->second.mouse;
+		}
+		else {
+			ParsecPermissions perms{};
+			perms.gamepad = guest.allowGamepadInput;
+			perms.keyboard = guest.allowKeyboardInput;
+			perms.mouse = guest.allowMouseInput;
+			_inputPermissions[guest.userID] = perms;
+		}
+
+		_guests.push_back(guest);
 
 		if (i < GUESTLIST_MAX_GUESTS)
 		{
 			guestNames[i] = guests[i].name;
 		}
 	}
+
 }
 
 vector<Guest>& GuestList::getGuests()
@@ -36,6 +45,7 @@ vector<Guest>& GuestList::getGuests()
 void GuestList::clear()
 {
 	_guests.clear();
+	_inputPermissions.clear();
 }
 
 const int GuestList::findIndex(uint32_t targetGuestID) {
@@ -263,9 +273,26 @@ bool GuestList::pop(uint32_t userID) {
 	auto it = find_if(_guests.begin(), _guests.end(), [userID](Guest& guest) { return guest.userID == userID; });
 	if (it != _guests.end()) {
 		_guests.erase(it);
+		_inputPermissions.erase(userID);
 		return true;
 	}
 	return false;
 }
 
+bool GuestList::setInputPermissions(uint32_t userID, bool gamepad, bool keyboard, bool mouse) {
+	ParsecPermissions perms{};
+	perms.gamepad = gamepad;
+	perms.keyboard = keyboard;
+	perms.mouse = mouse;
+	_inputPermissions[userID] = perms;
 
+	auto it = std::find_if(_guests.begin(), _guests.end(), [userID](Guest& guest) { return guest.userID == userID; });
+	if (it != _guests.end()) {
+		it->allowGamepadInput = gamepad;
+		it->allowKeyboardInput = keyboard;
+		it->allowMouseInput = mouse;
+		return true;
+	}
+
+	return false;
+}
