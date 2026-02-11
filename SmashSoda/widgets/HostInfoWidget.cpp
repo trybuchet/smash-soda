@@ -9,6 +9,9 @@ HostInfoWidget::HostInfoWidget(Hosting& hosting)
 void HostInfoWidget::renderArcade() {
 
 	Theme* theme = ThemeController::getInstance().getActiveTheme();
+	if (theme == nullptr) {
+		return;
+	}
 
 	static ImVec2 windowSize = ImVec2(250, 64);
 	static ImVec2 windowPos = ImVec2(0, 0);
@@ -92,12 +95,17 @@ void HostInfoWidget::renderArcade() {
 			}	
 		ImGui::EndGroup();
 	ImGui::EndGroup();
+	ImGui::End();
+	ImGui::PopStyleVar();
 
 }
 
 void HostInfoWidget::render() {
 
 	Theme* theme = ThemeController::getInstance().getActiveTheme();
+	if (theme == nullptr) {
+		return;
+	}
 
 	static bool isSessionExpired = false;
 	isSessionExpired = (_hosting.getHost().status == Guest::Status::EXPIRED);
@@ -125,20 +133,22 @@ void HostInfoWidget::render() {
 	ImGui::SetWindowSize(windowSize);
 	ImGui::SetWindowPos(windowPos);
 
-	static ParsecSession& session = _hosting.getSession();
+	ParsecSession& session = _hosting.getSession();
 
-	if (session.type == SessionCache::SessionType::THIRD) {
-		static uint32_t remainingTime;
-		static float fill;
+	if (session.type == SessionCache::SessionType::THIRD && !session.sessionId.empty()) {
+		static uint32_t remainingTime = 0;
+		static float fill = 0.0f;
 
-		if (session.getRemainingTime() > 0)
+		const uint32_t lifespan = session.getLifespan();
+		if (session.getRemainingTime() > 0 && lifespan > 0)
 		{
 			remainingTime = session.getRemainingTime();
-			fill = 1.0f - ((float)(remainingTime) / session.getLifespan());
+			fill = 1.0f - ((float)(remainingTime) / lifespan);
 		}
 		else if (session.isValid() && !session.isUpdating())
 		{
 			_hosting.fetchAccountData();
+			fill = 0.0f;
 		}
 
 

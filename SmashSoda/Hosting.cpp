@@ -77,11 +77,10 @@ void Hosting::init() {
 	GamepadClient::instance.setParsec(_parsec);
 	GamepadClient::instance.init();
 
-	_createGamepadsThread = thread([&]() {
+	std::thread([this]() {
 		GamepadClient::instance.createAllGamepads();
-		_createGamepadsThread.detach();
 		_macro.init();
-	});
+	}).detach();
 
 	audioOut.fetchDevices();
 	vector<AudioSourceDevice> audioOutDevices = audioOut.getDevices();

@@ -13,6 +13,14 @@ bool ParsecSession::loadSessionCache()
 		return true;
 	}
 
+	sessionId.clear();
+	hostPeerId.clear();
+	type = SessionCache::SessionType::THIRD;
+	_start = 0;
+	_expiry = 0;
+	_isValid = false;
+	Cache::cache.showParsecLogin = true;
+
 	return false;
 }
 
@@ -243,10 +251,9 @@ const bool ParsecSession::fetchSession(const char* email, const char* password, 
 
 void ParsecSession::fetchArcadeRoomList()
 {
-	_roomListThread = thread([&]() {
+	std::thread([this]() {
 		fetchArcadeRoomListSync();
-		_roomListThread.detach();
-	});
+	}).detach();
 }
 
 void ParsecSession::fetchArcadeRoomListSync()
@@ -317,14 +324,26 @@ void ParsecSession::fetchAccountData(Guest *user)
 		return;
 	}
 
-	_accountDataThread = thread ([user, this]() {
+	std::thread([user, this]() {
 		fetchAccountDataSync(user);
-		_accountDataThread.detach();
-	});
+	}).detach();
 }
 
 void ParsecSession::fetchAccountDataSync(Guest* user)
 {
+	if (user == nullptr) {
+		return;
+	}
+
+	if (sessionId.empty()) {
+		user->name = "Unknown Host";
+		user->userID = 0;
+		user->status = Guest::Status::INVALID;
+		_isValid = false;
+		_isUpdating = false;
+		return;
+	}
+
 	_isUpdating = true;
 
 	// Body

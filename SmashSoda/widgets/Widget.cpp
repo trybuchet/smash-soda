@@ -439,8 +439,11 @@ bool Widget::elPassword(std::string label, char* buffer, std::string help, std::
     ImGui::SetNextItemWidth(size.x - 20);
     ImGui::PushStyleColor(ImGuiCol_FrameBg, theme->formInputBackground);
     ImGui::PushStyleColor(ImGuiCol_Text, theme->formInputText);
-    ImGui::PushStyleColor(ImGuiCol_Border, theme->formInputBorderActive);
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+    if (!error.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+    }
+
     if (ImGui::InputText(inputLabel.c_str(), buffer, 256, ImGuiInputTextFlags_Password)) {
         response = true;
     }
@@ -462,10 +465,13 @@ bool Widget::elPassword(std::string label, char* buffer, std::string help, std::
             1.0f
         );
     }
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor();
-    ImGui::PopStyleColor();
-    ImGui::PopStyleColor();
+
+    if (!error.empty()) {
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
+    }
+
+    ImGui::PopStyleColor(2);
 
     ImGui::SetNextItemWidth(size.x - 20);
     elHelp(help);

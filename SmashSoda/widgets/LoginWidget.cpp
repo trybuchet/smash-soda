@@ -32,8 +32,7 @@ void LoginWidget::render(bool& showLogin) {
 
     // Reset style
     ImGui::PopStyleVar();
-    ImGui::PopStyleColor();
-    ImGui::PopStyleColor();
+    ImGui::PopStyleColor(3);
 
     startBody(true);
 
@@ -84,7 +83,8 @@ void LoginWidget::render(bool& showLogin) {
         _showError = false;
     }
 
-	endWidget();
+    ImGui::End();
+    ImGui::PopFont();
 }
 
 void LoginWidget::renderPersonal(float width, bool& showLogin) {

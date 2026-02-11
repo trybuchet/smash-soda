@@ -220,15 +220,6 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
         return false;
     };
 
-    ParsecSession& g_session = g_hosting.getSession();
-
-    thread t;
-    t = thread([&]() {
-        g_hosting.fetchAccountData(true);
-        Cache::cache.showParsecLogin = !g_hosting.getSession().isValid();
-        t.detach();
-        });
-
     // =====================================================================
     //  Soda Arcade
     // =====================================================================

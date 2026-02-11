@@ -83,14 +83,14 @@ public:
 
 	string hostPeerId;
 	string sessionId;
-	SessionCache::SessionType type;
+	SessionCache::SessionType type = SessionCache::SessionType::THIRD;
 
 	MTY_JSON *arcadeRooms;
 
 private:
 	const void extendSessionTime();
 
-	uint32_t _start, _expiry;
+	uint32_t _start = 0, _expiry = 0;
 	thread _accountDataThread, _roomListThread;
 	bool _isValid = false, _isAuthenticating = false;
 	bool _isUpdating = false;

@@ -183,6 +183,7 @@ bool VersionWidget::renderLoginWindow() {
     ImGui::End();
     ImGui::PopStyleColor();
     ImGui::PopStyleColor();
+    ImGui::PopStyleColor();
     ImGui::PopFont();
     ImGui::PopStyleVar();
 
