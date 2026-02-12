@@ -55,8 +55,22 @@ pause >nul
 :: --------- Config ----------
 set "BRANCH=preview"
 set "REPO_URL=https://github.com/trybuchet/smash-soda.git"
-set "SMASH_GLASS_URL=https://github.com/trybuchet/smash-soda-overlay/releases/download/4.0.0/smash-glass.zip"
+set "SMASH_GLASS_URL=https://github.com/trybuchet/smash-glass/releases/download/1.0.0/smash-glass-v1.00.zip"
 set "VIGEMBUS_URL=https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe"
+
+:: --------- Step toggles (1=run, 0=skip) ----------
+:: Use these for quick testing of installer sections.
+set "STEP_INSTALL_GIT=1"
+set "STEP_INSTALL_BUILD_TOOLS=1"
+set "STEP_INSTALL_CMAKE=1"
+set "STEP_INSTALL_VIGEMBUS=1"
+set "STEP_CLONE_SOURCE=1"
+set "STEP_BUILD=1"
+set "STEP_INSTALL_APP=1"
+set "STEP_MIGRATE_DATA=1"
+set "STEP_INSTALL_OVERLAY=1"
+set "STEP_CREATE_SHORTCUTS=1"
+set "STEP_CLEANUP=1"
 
 :: VS Build Tools 2026 (use aka.ms link which always points to latest stable)
 set "VS_BUILD_TOOLS_URL=https://aka.ms/vs/18/stable/vs_buildtools.exe"
@@ -82,6 +96,8 @@ echo Install folder: "%INSTALL_DIR%"
 set "WORK=%LOCALAPPDATA%\SmashSodaInstaller"
 set "SRC=%WORK%\src"
 set "BUILD=%WORK%\build"
+set "SRC_DIR=%SRC%\smash-soda"
+set "DEPS_DIR=%SRC_DIR%\dependencies"
 set "OVERLAY_ZIP=%WORK%\smash-glass.zip"
 set "VIGEMBUS_SETUP=%WORK%\ViGEmBus_1.22.0_x64_x86_arm64.exe"
 set "VS_BOOTSTRAP=%WORK%\vs_BuildTools.exe"
@@ -129,6 +145,10 @@ exit /b 0
 :: --------- Install Git ----------
 echo.
 echo [1/8] Installing Git...
+if "%STEP_INSTALL_GIT%"=="0" (
+  echo Skipped [1/8] Install Git.
+  goto :after_install_git
+)
 where git >nul 2>&1
 if %errorlevel% neq 0 (
   where winget >nul 2>&1
@@ -160,10 +180,15 @@ if %errorlevel% neq 0 (
   exit /b 1
 )
 echo Git is ready.
+:after_install_git
 
 :: --------- Install Build Tools ----------
 echo.
 echo [2/8] Installing Visual Studio Build Tools (C++ toolchain)...
+if "%STEP_INSTALL_BUILD_TOOLS%"=="0" (
+  echo Skipped [2/8] Install Build Tools.
+  goto :after_install_build_tools
+)
 
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 set "VSINSTALL="
@@ -258,10 +283,15 @@ if exist "%VSINSTALL%\Common7\Tools\VsDevCmd.bat" (
 )
 
 echo C++ build environment is ready.
+:after_install_build_tools
 
 :: --------- Install CMake ----------
 echo.
 echo [3/8] Installing CMake...
+if "%STEP_INSTALL_CMAKE%"=="0" (
+  echo Skipped [3/8] Install CMake.
+  goto :after_install_cmake
+)
 where cmake >nul 2>&1
 if %errorlevel% neq 0 (
   where winget >nul 2>&1
@@ -289,21 +319,30 @@ if %errorlevel% neq 0 (
   exit /b 1
 )
 echo CMake is ready.
+:after_install_cmake
 
 :: --------- ViGEmBus driver ----------
 echo.
 echo [4/8] ViGEmBus driver 
+if "%STEP_INSTALL_VIGEMBUS%"=="0" (
+  echo Skipped [4/8] ViGEmBus driver.
+  goto :after_install_vigembus
+)
 call :download "%VIGEMBUS_URL%" "%VIGEMBUS_SETUP%" "ViGEmBus Driver"
 if not exist "%VIGEMBUS_SETUP%" (
   echo ERROR: ViGEmBus installer was not downloaded.
   exit /b 1
 )
 "%VIGEMBUS_SETUP%" /qn
+:after_install_vigembus
 
 :: --------- Clone source ----------
 echo.
 echo [5/8] Cloning Smash Soda (%BRANCH% branch)...
-set "SRC_DIR=%SRC%\smash-soda"
+if "%STEP_CLONE_SOURCE%"=="0" (
+  echo Skipped [5/8] Clone source.
+  goto :after_clone_source
+)
 if exist "%SRC_DIR%" rmdir /s /q "%SRC_DIR%"
 git clone --branch "%BRANCH%" --single-branch "%REPO_URL%" "%SRC_DIR%"
 if %errorlevel% neq 0 (
@@ -314,10 +353,15 @@ if %errorlevel% neq 0 (
 set "DEPS_DIR=%SRC_DIR%\dependencies"
 if not exist "%DEPS_DIR%" set "DEPS_DIR=%SRC_DIR%\Dependencies"
 echo Source code cloned successfully.
+:after_clone_source
 
 :: --------- Build ----------
 echo.
 echo [6/8] Configuring CMake...
+if "%STEP_BUILD%"=="0" (
+  echo Skipped [6/8] Configure and [7/8] Build.
+  goto :after_build
+)
 cmake -S "%SRC_DIR%" -B "%BUILD%" -A x64
 if %errorlevel% neq 0 (
   echo ERROR: CMake configuration failed
@@ -338,8 +382,14 @@ if %errorlevel% neq 0 (
   pause
   exit /b 1
 )
+:after_build
 
 :: --------- Install ----------
+if "%STEP_INSTALL_APP%"=="0" (
+  echo.
+  echo Skipped [8/8] Install app files.
+  goto :after_install_app
+)
 set "RELEASE_DIR=%SRC_DIR%\x64\release"
 if not exist "%RELEASE_DIR%" (
   set "RELEASE_DIR=%BUILD%\Release"
@@ -361,11 +411,54 @@ if %errorlevel% neq 0 (
   pause
   exit /b 1
 )
+:after_install_app
+
+:: --------- Migrate user data ----------
+if "%STEP_MIGRATE_DATA%"=="0" (
+  echo.
+  echo Skipped migrate user data.
+  goto :after_migrate_user_data
+)
+echo.
+echo Checking for legacy Smash Soda appdata files...
+set "OLD_APPDATA_DIR=%APPDATA%\SmashSodaTwo"
+set "NEW_APPDATA_DIR=%APPDATA%\Trybuchet\Smash Soda"
+if not exist "%NEW_APPDATA_DIR%" mkdir "%NEW_APPDATA_DIR%"
+
+if exist "%OLD_APPDATA_DIR%" (
+  for %%F in (
+    banned.json
+    banned_ip_addresses.json
+    games.json
+    preferences.json
+    mods.json
+    profiles.json
+    session.json
+    tiers.json
+  ) do (
+    if exist "%OLD_APPDATA_DIR%\%%F" (
+      copy /Y "%OLD_APPDATA_DIR%\%%F" "%NEW_APPDATA_DIR%\%%F" >nul
+      if !errorlevel! equ 0 (
+        echo Migrated %%F
+      ) else (
+        echo WARNING: Failed to migrate %%F
+      )
+    )
+  )
+) else (
+  echo No legacy appdata folder found at "%OLD_APPDATA_DIR%". Skipping migration.
+)
+:after_migrate_user_data
 
 :: --------- Smash Glass Overlay ----------
+set "OVERLAY_DIR=%INSTALL_DIR%\overlay"
+if "%STEP_INSTALL_OVERLAY%"=="0" (
+  echo.
+  echo Skipped Smash Glass overlay install.
+  goto :after_install_overlay
+)
 echo.
 echo Installing Smash Glass overlay...
-set "OVERLAY_DIR=%INSTALL_DIR%\overlay"
 mkdir "%OVERLAY_DIR%" 2>nul
 call :download "%SMASH_GLASS_URL%" "%OVERLAY_ZIP%" "Smash Glass"
 %PS% -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%OVERLAY_ZIP%' -DestinationPath '%OVERLAY_DIR%' -Force"
@@ -376,6 +469,7 @@ if not exist "%OVERLAY_DIR%\themes" mkdir "%OVERLAY_DIR%\themes"
 :: Unblock overlay files
 %PS% -NoProfile -ExecutionPolicy Bypass -Command ^
   "Get-ChildItem -Path '%OVERLAY_DIR%' -Recurse | Unblock-File"
+:after_install_overlay
 
 echo.
 echo ============================================================
@@ -386,11 +480,19 @@ echo Overlay installed at: "%OVERLAY_DIR%"
 echo ============================================================
 echo.
 
-call :shortcuts
+if "%STEP_CREATE_SHORTCUTS%"=="0" (
+  echo Skipped shortcut creation step.
+) else (
+  call :shortcuts
+)
 
 echo.
 echo Cleaning up installer files...
-rmdir /s /q "%WORK%"
+if "%STEP_CLEANUP%"=="0" (
+  echo Skipped cleanup step.
+) else (
+  rmdir /s /q "%WORK%"
+)
 
 echo.
 echo Press any key to exit...

@@ -14,7 +14,8 @@ OverlayState OverlayService::state() const {
     return _state;
 }
 
-bool OverlayService::isRunning() const {
+bool OverlayService::isRunning() {
+    refreshProcessState();
     return _state == OverlayState::RunningNoWS || _state == OverlayState::RunningConnected;
 }
 
@@ -23,7 +24,9 @@ bool OverlayService::isConnected() const {
 }
 
 void OverlayService::start() {
-    if (isRunning()) {
+    refreshProcessState();
+
+    if (_state == OverlayState::Launching || isRunning()) {
         return;
     }
 
@@ -39,8 +42,12 @@ void OverlayService::start() {
 }
 
 void OverlayService::stop() {
+    refreshProcessState();
+
     _connected = false;
-    if (_state == OverlayState::Stopped) {
+    _pendingOpenMenu = false;
+
+    if (_state == OverlayState::Stopped && _pid == 0) {
         return;
     }
 
@@ -49,8 +56,10 @@ void OverlayService::stop() {
 }
 
 void OverlayService::onWebSocketOpen() {
+    refreshProcessState();
+
     _connected = true;
-    if (_state == OverlayState::RunningNoWS) {
+    if (_state == OverlayState::RunningNoWS || _state == OverlayState::Launching || _state == OverlayState::Stopped) {
         _state = OverlayState::RunningConnected;
     }
     if (_pendingOpenMenu) {
@@ -60,6 +69,8 @@ void OverlayService::onWebSocketOpen() {
 }
 
 void OverlayService::onWebSocketClose() {
+    refreshProcessState();
+
     _connected = false;
     if (_state == OverlayState::RunningConnected) {
         _state = OverlayState::RunningNoWS;
@@ -67,6 +78,13 @@ void OverlayService::onWebSocketClose() {
 }
 
 void OverlayService::openMenu() {
+    refreshProcessState();
+
+    // If the overlay was closed manually, restart it on-demand.
+    if (!isRunning()) {
+        start();
+    }
+
     if (_connected) {
         WebSocket::instance.sendMessageToAll("{\"event\":\"open:menu\"}");
     } else {
@@ -139,4 +157,22 @@ bool OverlayService::processIsAlive() const {
     BOOL ok = GetExitCodeProcess(hProcess, &exitCode);
     CloseHandle(hProcess);
     return ok && exitCode == STILL_ACTIVE;
+}
+
+void OverlayService::refreshProcessState() {
+    if (_pid == 0) {
+        return;
+    }
+
+    if (!processIsAlive()) {
+        _pid = 0;
+        _connected = false;
+        _pendingOpenMenu = false;
+        _state = OverlayState::Stopped;
+        return;
+    }
+
+    if (_state == OverlayState::Stopped || _state == OverlayState::Launching) {
+        _state = _connected ? OverlayState::RunningConnected : OverlayState::RunningNoWS;
+    }
 }

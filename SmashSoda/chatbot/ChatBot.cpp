@@ -103,7 +103,8 @@ ACommand* ChatBot::identifyUserDataMessage(const char* msg, Guest& sender, bool 
 	}
 
 	if (isCommand(msg, CommandSFX::prefixes())) {
-		return new CommandSFX(msg, sender);
+		const bool isSenderHost = isHost || sender.userID == _host.userID;
+		return new CommandSFX(msg, sender, isSenderHost);
 	}
 
 	if (isCommand(msg, CommandStopSFX::prefixes())) {

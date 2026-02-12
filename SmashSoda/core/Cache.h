@@ -2,6 +2,7 @@
 
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <nlohmann/json.hpp>
 #include "GuestList.h"
 #include "../lists/VerifiedList.h"
@@ -73,6 +74,7 @@ public:
 	static bool deleteSessionCache();
 
     bool checkForUpdates();
+    void reloadSfxList();
     
     void banIPAddress(std::string ip);
 	void unbanIPAddress(std::string ip);
@@ -102,6 +104,8 @@ private:
 	static string _nonce;
 
     void LoadBannedIpAddresses();
+    void syncSfxConfig();
+    vector<string> listCustomSfxFiles() const;
 };
 
 

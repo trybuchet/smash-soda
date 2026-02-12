@@ -42,13 +42,6 @@ echo.
 set "BRANCH=preview"
 set "REPO_URL=https://github.com/trybuchet/smash-soda.git"
 set "SMASH_GLASS_VERSION=%~1"
-if not defined SMASH_GLASS_VERSION (
-  set "CMDLINE_LAST="
-  for %%A in (%CMDCMDLINE%) do set "CMDLINE_LAST=%%~A"
-  if defined CMDLINE_LAST (
-    echo(!CMDLINE_LAST! | findstr /r "^[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$" >nul && set "SMASH_GLASS_VERSION=!CMDLINE_LAST!"
-  )
-)
 set "SMASH_GLASS_URL="
 if defined SMASH_GLASS_VERSION (
   set "SMASH_GLASS_URL=https://github.com/trybuchet/smash-soda-overlay/releases/download/%SMASH_GLASS_VERSION%/smash-glass.zip"

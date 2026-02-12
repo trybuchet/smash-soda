@@ -6,6 +6,7 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
+#include <unordered_map>
 #include <Windows.h>
 #include <mmeapi.h>
 #include <codecvt>
@@ -34,7 +35,7 @@ public:
 	};
 
 	void init(const char* jsonPath);
-	int64_t getRemainingCooldown();
+	int64_t getRemainingCooldown(const string& tag = "");
 	SFXPlayResult play(const string tag);
 	const string loadedTags();
 	const size_t size();
@@ -42,6 +43,7 @@ public:
 private:
 	steady_clock::time_point _lastUseTimestamp;
 	SFX _lastSFX;
+	unordered_map<string, steady_clock::time_point> _lastUseByTag;
 	vector<SFX> _sfxList;
 	string _loadedTags;
 	int64_t _lastCooldown;

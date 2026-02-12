@@ -318,7 +318,7 @@ bool GamepadClient::connect(int gamepadIndex)
 
 bool GamepadClient::clearOwner(int gamepadIndex)
 {
-	if (gamepadIndex >= 0 || gamepadIndex < gamepads.size()) {
+	if (gamepadIndex >= 0 && gamepadIndex < gamepads.size()) {
 
 		Hotseat::instance.pauseUser(gamepads[gamepadIndex]->owner.guest.userID);
 		gamepads[gamepadIndex]->clearOwner();
@@ -360,6 +360,7 @@ int GamepadClient::clearAFK(GuestList &guests)
 			Guest guest;
 			if (!guests.find(pad->owner.guest.userID, &guest))
 			{
+				Hotseat::instance.pauseUser(pad->owner.guest.userID);
 				pad->clearOwner();
 				clearCount++;
 			}
@@ -371,6 +372,8 @@ int GamepadClient::clearAFK(GuestList &guests)
 
 int GamepadClient::onQuit(Guest& guest) {
 	int result = 0;
+
+	Hotseat::instance.pauseUser(guest.userID);
 
 	reduce([&](AGamepad* gamepad) {
 		if (gamepad->owner.guest.userID == guest.userID) {
@@ -411,10 +414,11 @@ bool GamepadClient::stripAll() {
 
 	reduce([&](AGamepad* gamepad) {
 		if (gamepad->isOwned()) {
+			const uint32_t ownerUserID = gamepad->owner.guest.userID;
 			gamepad->clearOwner();
 			success = true;
 
-			Hotseat::instance.pauseUser(gamepad->owner.guest.userID);
+			Hotseat::instance.pauseUser(ownerUserID);
 		}
 	});
 
@@ -1136,6 +1140,5 @@ XINPUT_STATE GamepadClient::toXInput(ParsecKeyboardMessage& key, AGamepad::Keybo
 	//-- CodeSomnia Modified End--
 	return result;
 }
-
 
 

@@ -1,6 +1,9 @@
 ﻿#include "Cache.h"
 #include <thread>
 #include <chrono>
+#include <algorithm>
+#include <cctype>
+#include <Windows.h>
 #include "Config.h"
 
 // These are the sort of issues Parsec introduced when
@@ -10,6 +13,18 @@ string Cache::_nonce = "SmashSoda**";
 
 // Global cache object
 Cache Cache::cache = Cache();
+namespace {
+	constexpr uint32_t DEFAULT_SFX_COOLDOWN = 5;
+	string StripFileExtension(const string& fileName) {
+		const size_t slashPos = fileName.find_last_of("/\\");
+		const size_t startPos = (slashPos == string::npos) ? 0 : slashPos + 1;
+		const size_t dotPos = fileName.find_last_of('.');
+		if (dotPos == string::npos || dotPos <= startPos) {
+			return fileName.substr(startPos);
+		}
+		return fileName.substr(startPos, dotPos - startPos);
+	}
+}
 
 /**
  * @brief Cache constructor
@@ -40,8 +55,8 @@ Cache::Cache() {
     vector<GuestData> vips = VIPList::LoadFromFile();
     vipList = VIPList(vips);
 
-	// Load SFX
-	sfxList.init("./SFX/custom/_sfx.json");
+	// Sync and load SFX from AppData
+	reloadSfxList();
 
     // Load banned IP addresses from file
     LoadBannedIpAddresses();
@@ -55,6 +70,126 @@ Cache::Cache() {
 	// Get the VPN list
 	getVPNList();
 
+}
+
+void Cache::reloadSfxList() {
+	const string configPath = PathHelper::GetConfigPath();
+	if (configPath.empty()) {
+		return;
+	}
+
+	syncSfxConfig();
+	sfxList.init((configPath + "sfx.json").c_str());
+}
+
+vector<string> Cache::listCustomSfxFiles() const {
+	vector<string> files;
+	auto hasAudioExtension = [](const string& fileName) {
+		size_t dotPos = fileName.find_last_of('.');
+		if (dotPos == string::npos) {
+			return false;
+		}
+
+		string ext = fileName.substr(dotPos);
+		transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) {
+			return static_cast<char>(tolower(c));
+		});
+
+		return ext == ".wav" || ext == ".mp3" || ext == ".ogg" || ext == ".flac" || ext == ".m4a";
+	};
+
+	WIN32_FIND_DATAA findData;
+	HANDLE hFind = FindFirstFileA("./SFX/custom/*", &findData);
+	if (hFind == INVALID_HANDLE_VALUE) {
+		return files;
+	}
+
+	do {
+		if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+			continue;
+		}
+
+		string fileName = findData.cFileName;
+		if (!hasAudioExtension(fileName)) {
+			continue;
+		}
+
+		files.push_back(fileName);
+	} while (FindNextFileA(hFind, &findData));
+
+	FindClose(hFind);
+	sort(files.begin(), files.end());
+	return files;
+}
+
+void Cache::syncSfxConfig() {
+	const string configPath = PathHelper::GetConfigPath();
+	if (configPath.empty()) {
+		return;
+	}
+
+	const string sfxConfigPath = configPath + "sfx.json";
+	unordered_map<string, uint32_t> cooldownByTag;
+
+	if (MTY_FileExists(sfxConfigPath.c_str())) {
+		try {
+			size_t size = 0;
+			void* data = MTY_ReadFile(sfxConfigPath.c_str(), &size);
+			if (data != nullptr && size > 0) {
+				string text(static_cast<char*>(data), size);
+				json existing = json::parse(text);
+
+				if (existing.contains("sfx") && existing["sfx"].is_array()) {
+					for (const auto& entry : existing["sfx"]) {
+						if (!entry.is_object()) {
+							continue;
+						}
+
+							string tag = entry.value("tag", "");
+							if (tag.empty()) {
+								tag = entry.value("path", "");
+							}
+							if (tag.empty()) {
+								continue;
+							}
+
+							const uint32_t cooldown = entry.value("cooldown", DEFAULT_SFX_COOLDOWN);
+							const string path = entry.value("path", "");
+							cooldownByTag[tag] = cooldown;
+							cooldownByTag[StripFileExtension(tag)] = cooldown;
+							if (!path.empty()) {
+								cooldownByTag[path] = cooldown;
+								cooldownByTag[StripFileExtension(path)] = cooldown;
+							}
+						}
+					}
+				}
+			if (data != nullptr) {
+				MTY_Free(data);
+			}
+		}
+		catch (const std::exception&) {}
+	}
+
+	const vector<string> files = listCustomSfxFiles();
+
+	json out;
+	out["sfx"] = json::array();
+	for (const auto& fileName : files) {
+		const string tag = StripFileExtension(fileName);
+		json entry;
+		entry["path"] = fileName;
+		entry["tag"] = tag;
+		const auto tagIt = cooldownByTag.find(tag);
+		const auto fileIt = cooldownByTag.find(fileName);
+		entry["cooldown"] = tagIt != cooldownByTag.end()
+			? tagIt->second
+			: (fileIt != cooldownByTag.end() ? fileIt->second : DEFAULT_SFX_COOLDOWN);
+		out["sfx"].push_back(entry);
+	}
+
+	const string outText = out.dump(4);
+	MTY_WriteTextFile(sfxConfigPath.c_str(), "%s", outText.c_str());
 }
 
 SessionCache Cache::loadSessionCache() {
@@ -521,3 +656,9 @@ void Cache::addGlobalBan(uint32_t userId) {
 bool Cache::isGlobalBanned(uint32_t userId) {
     return std::find(globalBans.begin(), globalBans.end(), userId) != globalBans.end();
 }
+
+
+
+
+
+

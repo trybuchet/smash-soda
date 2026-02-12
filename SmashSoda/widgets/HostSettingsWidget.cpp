@@ -151,6 +151,9 @@ bool HostSettingsWidget::render(bool& showWindow, HWND& hwnd) {
             name = name.substr(0, 50);
             strcpy_s(_roomName, name.c_str());
         }
+        if (_hosting.isRunning()) {
+            _updated = true;
+        }
     }
 
     if (elText("Game Name", _gameName, "Here you can tell people what game you're hosting. Max 255 characters.")) {
@@ -158,6 +161,9 @@ bool HostSettingsWidget::render(bool& showWindow, HWND& hwnd) {
             string name = _gameName;
             name = name.substr(0, 50);
             strcpy_s(_gameName, name.c_str());
+        }
+        if (_hosting.isRunning()) {
+            _updated = true;
         }
     }
 
@@ -224,7 +230,9 @@ bool HostSettingsWidget::render(bool& showWindow, HWND& hwnd) {
     }
 
     if (elNumber("Latency Limit", _latencyLimit, 0, 64, "The maximum latency for guests (when latency limiter is enabled).")) {
-        if (_hosting.isRunning()) {}
+        if (_hosting.isRunning()) {
+            _updated = true;
+        }
     }
 
     endBody();
@@ -243,6 +251,27 @@ bool HostSettingsWidget::render(bool& showWindow, HWND& hwnd) {
             ImGui::OpenPopup(_popupTitle.c_str());
         }
     } else {
+        if (isDirty()) {
+            if (elBtn("Update Settings")) {
+                if (validateSettings()) {
+                    savePreferences();
+
+                    _hosting.setHostConfig(_roomName, _gameID, _maxGuests, !Config::cfg.room.privateRoom, _secret);
+                    _hosting.applyHostConfig();
+
+                    if (!Config::cfg.room.privateRoom) {
+                        Arcade::instance.createPost();
+                    } else {
+                        Arcade::instance.deletePost();
+                    }
+
+                    _updated = false;
+                    updateSecretLink();
+                }
+            }
+            ImGui::SameLine();
+        }
+
         if (elBtnSecondary("Stop Hosting")) {
             _popupTitle = "Stop Hosting";
             _popupMessage = "Are you sure you want to stop hosting?";
@@ -342,6 +371,7 @@ void HostSettingsWidget::renderAudio() {
 /// Saves the new preferences.
 /// </summary>
 void HostSettingsWidget::savePreferences() {
+    Config::cfg.room.name = _roomName;
 	Config::cfg.room.game = _gameName;
 	Config::cfg.room.details = _description;
     Config::cfg.room.guestLimit = _maxGuests;

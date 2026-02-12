@@ -93,7 +93,17 @@ std::string StopwatchTimer::getRemainingTime() {
 /// </summary>
 /// <param name="minutes"></param>
 void StopwatchTimer::addMinutes(int minutes) {
-    _timeChange += (minutes * 60 * 1000);
+    if (minutes <= 0) {
+        return;
+    }
+
+    const int deltaMs = minutes * 60 * 1000;
+    _totalMin += minutes;
+
+    // When paused/stopped, keep remaining time in sync immediately.
+    if (!_isRunning || _isPaused) {
+        _remainingTime += deltaMs;
+    }
 }
 
 /// <summary>
@@ -101,7 +111,17 @@ void StopwatchTimer::addMinutes(int minutes) {
 /// </summary>
 /// <param name="minutes"></param>
 void StopwatchTimer::subtractMinutes(int minutes) {
-    _timeChange -= (minutes * 60 * 1000);
+    if (minutes <= 0) {
+        return;
+    }
+
+    const int deltaMs = minutes * 60 * 1000;
+    _totalMin = (std::max)(0, _totalMin - minutes);
+
+    // When paused/stopped, keep remaining time in sync immediately.
+    if (!_isRunning || _isPaused) {
+        _remainingTime = (std::max)(0, _remainingTime - deltaMs);
+    }
 }
 
 /// <summary>
@@ -142,5 +162,4 @@ void StopwatchTimer::updateRemainingTime() {
 		}
     }
 }
-
 

@@ -32,22 +32,25 @@ void Hotseat::start() {
         running = true;
         hotseatThread = std::thread([&] {
 
-            while (running) {
+	            while (running) {
+					vector<int> staleUsers;
 
-                // For each hotseat user
-                for (HotseatUser& user : Hotseat::instance.users) {
+	                // For each hotseat user
+	                for (HotseatUser& user : Hotseat::instance.users) {
 
-					// Is the user seated?
-					if (user.inSeat) {
+						// Is the user seated?
+						if (user.inSeat) {
+							// Update stopwatch state before checking completion.
+							user.stopwatch->getRemainingSec();
 
-						// Has the user's playtime ended?
-						if (user.stopwatch->isFinished()) {
+							// Has the user's playtime ended?
+							if (user.stopwatch->isFinished()) {
 
-							// Pause the user
-							user.inSeat = false;
-                            user.cooldown = true;
-                            user.cooldownTimer->start(Config::cfg.hotseat.resetTime);
-                            user.timeLastPlayed = getCurrentTimestamp();
+								// Pause the user
+								user.inSeat = false;
+	                            user.cooldown = true;
+	                            user.cooldownTimer->start(Config::cfg.hotseat.resetTime);
+	                            user.timeLastPlayed = getCurrentTimestamp();
 
                             // Strip pads
                             GamepadClient::instance.strip(user.userId);
@@ -55,28 +58,35 @@ void Hotseat::start() {
 							// Log user paused
 							log(user.userName + " has run out of time. They have " + getCooldownRemaining(user.userId) + " to wait.");
 
-                        }
+	                        }
 
-					} else if (user.cooldown && user.cooldownTimer->isFinished()) {
+						} else if (user.cooldown) {
+							// Update cooldown timer state before checking completion.
+							user.cooldownTimer->getRemainingSec();
 
-                        user.stopwatch->start(Config::cfg.hotseat.playTime);
-                        user.stopwatch->pause();
-                        user.cooldown = false;
-                        user.cooldownTimer->start(Config::cfg.hotseat.resetTime);
-                        user.cooldownTimer->pause();
-                        user.timeLastPlayed = getCurrentTimestamp();
+							if (user.cooldownTimer->isFinished()) {
+
+	                            user.stopwatch->start(Config::cfg.hotseat.playTime);
+	                            user.stopwatch->pause();
+	                            user.cooldown = false;
+	                            user.cooldownTimer->stop();
+	                            user.timeLastPlayed = getCurrentTimestamp();
+	                        }
+
+						}
+
+					// Check if the user has been inactive for too long
+	                    else if (getMinutesDifference(user.timeLastPlayed, getCurrentTimestamp()) >= Config::cfg.hotseat.resetTime) {
+
+	                        staleUsers.push_back(user.userId);
+
+	                    }
 
 					}
 
-					// Check if the user has been inactive for too long
-                    else if (getMinutesDifference(user.timeLastPlayed, getCurrentTimestamp()) >= Config::cfg.hotseat.resetTime) {
-
-                        // Remove HotseatUser from the list
-                        Hotseat::instance.removeUser(user.userId);
-
-                    }
-
-				}
+					for (int userId : staleUsers) {
+						Hotseat::instance.removeUser(userId);
+					}
 
                 // Reminder intervals
                 if (Config::cfg.hotseat.reminderInterval > 0 && reminderTimer->isFinished()) {
@@ -128,7 +138,7 @@ void Hotseat::_createUser(int id, std::string name) {
     HotseatUser user;
     user.userId = id;
     user.userName = name;
-    user.inSeat = true;
+    user.inSeat = false;
     user.timeLastPlayed = getCurrentTimestamp();
     user.stopwatch = new StopwatchTimer();
     user.cooldownTimer = new StopwatchTimer();
@@ -146,13 +156,16 @@ void Hotseat::_createUser(int id, std::string name) {
 bool Hotseat::checkUser(int id, string name) {
 
     // Find user
-    HotseatUser* user = getUser(id);
-    if (user != nullptr) {
-		
-        // Does the user have time remaining?
-        if (user->stopwatch->getRemainingSec() > 0) {
-			return true;
-		}
+	    HotseatUser* user = getUser(id);
+	    if (user != nullptr) {
+			if (user->cooldown) {
+				return false;
+			}
+			
+	        // Does the user have time remaining?
+	        if (user->stopwatch->getRemainingSec() > 0) {
+				return true;
+			}
 
         return false;
 
@@ -192,20 +205,30 @@ bool Hotseat::seatUser(int id, string name) {
 
     // Find user
 	HotseatUser* user = getUser(id);
-	if (user != nullptr) {
+		if (user != nullptr) {
 
 		// Is the user already seated?
 		if (user->inSeat) {
 			return false;
 		}
 
-		// Seat the user
-		user->inSeat = true;
-        user->timeLastPlayed = getCurrentTimestamp();
-		log(name + " is now in the hotseat. They have " + getUserTimeRemaining(user->userId) + " remaining.");
+			// Seat the user
+			if (user->cooldown) {
+				return false;
+			}
+			user->inSeat = true;
+	        user->timeLastPlayed = getCurrentTimestamp();
+			log(name + " is now in the hotseat. They have " + getUserTimeRemaining(user->userId) + " remaining.");
 
-        // Start the stopwatch
-        user->stopwatch->resume();
+	        // Resume paused timer when available; otherwise start a fresh play window.
+	        if (user->stopwatch->isPaused()) {
+	            user->stopwatch->resume();
+	        }
+	        else if (!user->stopwatch->isRunning()) {
+	            if (user->stopwatch->getRemainingSec() <= 0) {
+	                user->stopwatch->start(Config::cfg.hotseat.playTime);
+	            }
+	        }
 
 		return true;
 	} else {
@@ -239,11 +262,11 @@ void Hotseat::pauseUser(int id) {
     if (user != nullptr) {
 
 		// Is the user seated?
-		if (user->inSeat) {
+			if (user->inSeat) {
 
-			// Pause the stopwatch
-			user->stopwatch->pause();
-            user->inSeat = false;
+				// Pause the stopwatch
+				user->stopwatch->pause();
+	            user->inSeat = false;
             user->timeLastPlayed = getCurrentTimestamp();
 
 			// Log user paused
@@ -289,6 +312,38 @@ void Hotseat::increaseUserCooldown(int id, long minutes) {
  */
 void Hotseat::decreaseUserCooldown(int id, long minutes) {
 
+}
+
+void Hotseat::applySettingsDelta(int playDeltaMinutes, int resetDeltaMinutes, int reminderIntervalMinutes) {
+	for (HotseatUser& user : users) {
+		if (playDeltaMinutes != 0) {
+			if (playDeltaMinutes > 0) {
+				user.stopwatch->addMinutes(playDeltaMinutes);
+			}
+			else {
+				user.stopwatch->subtractMinutes(-playDeltaMinutes);
+			}
+		}
+
+		if (user.cooldown && resetDeltaMinutes != 0) {
+			if (resetDeltaMinutes > 0) {
+				user.cooldownTimer->addMinutes(resetDeltaMinutes);
+			}
+			else {
+				user.cooldownTimer->subtractMinutes(-resetDeltaMinutes);
+			}
+		}
+	}
+
+	// Restart reminder cadence using latest interval.
+	if (running) {
+		if (reminderIntervalMinutes > 0) {
+			reminderTimer->start(reminderIntervalMinutes);
+		}
+		else {
+			reminderTimer->stop();
+		}
+	}
 }
 
 /**

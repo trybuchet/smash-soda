@@ -16,8 +16,8 @@ public:
 	 * 
 	 * @param sender 
 	 */
-	CommandSFX(const char* msg, Guest& sender)
-		: ACommand(msg, sender), _sender(sender)
+	CommandSFX(const char* msg, Guest& sender, bool isHost = false)
+		: ACommand(msg, sender), _sender(sender), _isHost(isHost)
 	{}
 
 	/**
@@ -28,15 +28,18 @@ public:
 	 */
 	bool run() override {
 
-		// Tier list enabled?
 		Tier tier = Cache::cache.tierList.getTier(_sender.userID);
+		const bool isModOrHost = _isHost || tier == Tier::MOD || tier == Tier::GOD;
+		const bool isVIP = Cache::cache.vipList.isVIP(_sender.userID);
 
-		// SFX enabled?
-		if (tier == Tier::GUEST && !Config::cfg.permissions.guest.useSFX ||
-			tier == Tier::MOD && !Config::cfg.permissions.moderator.useSFX ||
-			Cache::cache.vipList.isVIP(_sender.userID) && !Config::cfg.permissions.vip.useSFX) {
-			setReply("You do not have permission to use this command.\0");
-			return false;
+		// Host and moderators should always be able to use SFX.
+		if (!isModOrHost) {
+			const bool guestBlocked = !isVIP && !Config::cfg.permissions.guest.useSFX;
+			const bool vipBlocked = isVIP && !Config::cfg.permissions.vip.useSFX;
+			if (guestBlocked || vipBlocked) {
+				setReply("You do not have permission to use this command.\0");
+				return false;
+			}
 		}
 
 		if (Cache::cache.sfxList.size() <= 0) {
@@ -59,11 +62,11 @@ public:
 		transform(sound.begin(), sound.end(), sound.begin(), ::tolower);
 		SFXList::SFXPlayResult result = Cache::cache.sfxList.play(sound);
 
-		switch (result) {
-		case SFXList::SFXPlayResult::COOLDOWN:
-			setReply(string("Command !sfx is on cooldown: ") +
-				to_string(Cache::cache.sfxList.getRemainingCooldown()) +
-				string(" seconds left."));
+			switch (result) {
+			case SFXList::SFXPlayResult::COOLDOWN:
+				setReply(string("Command !sfx is on cooldown: ") +
+					to_string(Cache::cache.sfxList.getRemainingCooldown(sound)) +
+					string(" seconds left."));
 			break;
 		case SFXList::SFXPlayResult::NOT_FOUND:
 				setReply("Sound effect not found.");
@@ -88,6 +91,7 @@ public:
 
 protected:
 	Guest& _sender;
+	bool _isHost;
 
 	static vector<const char*> internalPrefixes() {
 		return vector<const char*> { "!sfx " };

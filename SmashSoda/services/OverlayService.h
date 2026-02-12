@@ -22,7 +22,7 @@ public:
     void openMenu();
 
     OverlayState state() const;
-    bool isRunning() const;
+    bool isRunning();
     bool isConnected() const;
 
 private:
@@ -31,6 +31,7 @@ private:
     bool launchProcess();
     void killProcess();
     bool processIsAlive() const;
+    void refreshProcessState();
 
     OverlayState _state = OverlayState::Stopped;
     DWORD _pid = 0;

@@ -20,6 +20,7 @@ public:
 	bool render(bool& showWindow);
 	void renderGeneral();
 	void renderChatbot();
+	void renderSfx();
 	void renderPermissions();
 	void renderHotkeys();
 

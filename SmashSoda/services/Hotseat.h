@@ -53,6 +53,7 @@ public:
 	void reduceUserPlaytime(int id, long ms);
 	void increaseUserCooldown(int id, long ms);
 	void decreaseUserCooldown(int id, long ms);
+	void applySettingsDelta(int playDeltaMinutes, int resetDeltaMinutes, int reminderIntervalMinutes);
 
 	bool inSeat(int id);
 
