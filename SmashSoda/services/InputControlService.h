@@ -1,6 +1,9 @@
 #pragma once
 
 #include <Windows.h>
+#include <array>
+#include <atomic>
+#include <mutex>
 #include "parsec.h"
 
 class InputControlService {
@@ -25,10 +28,15 @@ public:
     bool keyUp(WORD virtualKey) const;
     bool keyPress(WORD virtualKey) const;
 
+    void noteHostPhysicalInput();
     bool handleParsecMessage(const ParsecMessage& message) const;
 
 private:
     InputControlService() = default;
+
+    bool isHostOverrideActive() const;
+    bool shouldBlockGuestMessage(const ParsecMessage& message) const;
+    void releaseGuestHeldInputs() const;
 
     bool sendMouseInput(DWORD flags, DWORD mouseData = 0) const;
     bool sendKeyboardInput(WORD virtualKey, DWORD flags) const;
@@ -36,4 +44,14 @@ private:
     bool handleParsecMouseButton(const ParsecMouseButtonMessage& mouseButton) const;
     bool handleParsecMouseWheel(const ParsecMouseWheelMessage& mouseWheel) const;
     bool handleParsecMouseMotion(const ParsecMouseMotionMessage& mouseMotion) const;
+
+    mutable std::array<bool, 256> _guestKeysDown = {};
+    mutable bool _guestLeftDown = false;
+    mutable bool _guestRightDown = false;
+    mutable bool _guestMiddleDown = false;
+    mutable bool _guestX1Down = false;
+    mutable bool _guestX2Down = false;
+    mutable bool _wasBlockingGuestInput = false;
+    mutable std::mutex _stateMutex;
+    std::atomic<ULONGLONG> _lastHostPhysicalInputMs { 0 };
 };

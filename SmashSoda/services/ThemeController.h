@@ -11,6 +11,7 @@
 #include "../themes/EmeraldTheme.h"
 #include "../themes/IndigoTheme.h"
 #include "../themes/GoldenTheme.h"
+#include "../themes/WildfireTheme.h"
 #include "helpers/PathHelper.h"
 
 class ThemeController {

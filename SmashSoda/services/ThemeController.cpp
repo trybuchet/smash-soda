@@ -15,6 +15,7 @@ void ThemeController::loadDefaultThemes() {
     addTheme(std::make_unique<EmeraldTheme>());
     addTheme(std::make_unique<GoldenTheme>());
     addTheme(std::make_unique<IndigoTheme>());
+    addTheme(std::make_unique<WildfireTheme>());
 }
 
 void ThemeController::loadCustomThemes() {

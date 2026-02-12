@@ -1,6 +1,85 @@
 #include "InputControlService.h"
+#include "../core/Config.h"
+
+#include <algorithm>
+#include <cmath>
+#include <vector>
 
 namespace {
+    constexpr ULONGLONG HOST_OVERRIDE_WINDOW_MS = 300;
+
+    BOOL CALLBACK collectMonitorRects(HMONITOR, HDC, LPRECT rect, LPARAM data) {
+        if (data == 0 || rect == nullptr) {
+            return TRUE;
+        }
+
+        auto* monitorRects = reinterpret_cast<std::vector<RECT>*>(data);
+        monitorRects->push_back(*rect);
+        return TRUE;
+    }
+
+    bool getSelectedMonitorRect(RECT& outRect) {
+        std::vector<RECT> monitorRects;
+        EnumDisplayMonitors(nullptr, nullptr, collectMonitorRects, reinterpret_cast<LPARAM>(&monitorRects));
+        if (monitorRects.empty()) {
+            return false;
+        }
+
+        size_t monitorIndex = Config::cfg.video.monitor;
+        if (monitorIndex >= monitorRects.size()) {
+            monitorIndex = 0;
+        }
+
+        outRect = monitorRects[monitorIndex];
+        return true;
+    }
+
+    void getStreamMouseResolution(const RECT& monitorRect, int& width, int& height) {
+        width = monitorRect.right - monitorRect.left;
+        height = monitorRect.bottom - monitorRect.top;
+
+        const size_t resolutionIndex = Config::cfg.video.resolutionIndex;
+        if (resolutionIndex > 0 && resolutionIndex < Config::cfg.resolutions.size()) {
+            const int configuredWidth = Config::cfg.resolutions[resolutionIndex].width;
+            const int configuredHeight = Config::cfg.resolutions[resolutionIndex].height;
+            if (configuredWidth > 0 && configuredHeight > 0) {
+                width = configuredWidth;
+                height = configuredHeight;
+            }
+        }
+    }
+
+    LONG remapAxis(LONG value, int sourceSize, int destinationSize, LONG destinationOrigin) {
+        if (sourceSize <= 1 || destinationSize <= 1) {
+            return destinationOrigin;
+        }
+
+        const LONG sourceMax = static_cast<LONG>(sourceSize - 1);
+        const LONG clamped = std::clamp(value, 0L, sourceMax);
+        const double normalized = static_cast<double>(clamped) / static_cast<double>(sourceMax);
+        const LONG mapped = static_cast<LONG>(std::lround(normalized * static_cast<double>(destinationSize - 1)));
+        return destinationOrigin + mapped;
+    }
+
+    void remapAbsoluteMouseToDesktop(LONG inX, LONG inY, LONG& outX, LONG& outY) {
+        RECT monitorRect = {};
+        if (!getSelectedMonitorRect(monitorRect)) {
+            outX = inX;
+            outY = inY;
+            return;
+        }
+
+        int inputWidth = 0;
+        int inputHeight = 0;
+        getStreamMouseResolution(monitorRect, inputWidth, inputHeight);
+
+        const int monitorWidth = monitorRect.right - monitorRect.left;
+        const int monitorHeight = monitorRect.bottom - monitorRect.top;
+
+        outX = remapAxis(inX, inputWidth, monitorWidth, monitorRect.left);
+        outY = remapAxis(inY, inputHeight, monitorHeight, monitorRect.top);
+    }
+
     struct KeyTranslation {
         WORD vk;
         bool extended;
@@ -173,6 +252,63 @@ InputControlService& InputControlService::instance() {
     return s_instance;
 }
 
+void InputControlService::noteHostPhysicalInput() {
+    _lastHostPhysicalInputMs.store(GetTickCount64(), std::memory_order_relaxed);
+}
+
+bool InputControlService::isHostOverrideActive() const {
+    const ULONGLONG lastHostInput = _lastHostPhysicalInputMs.load(std::memory_order_relaxed);
+    if (lastHostInput == 0) {
+        return false;
+    }
+
+    const ULONGLONG now = GetTickCount64();
+    return now >= lastHostInput && (now - lastHostInput) <= HOST_OVERRIDE_WINDOW_MS;
+}
+
+bool InputControlService::shouldBlockGuestMessage(const ParsecMessage& message) const {
+    if (message.type != MESSAGE_KEYBOARD &&
+        message.type != MESSAGE_MOUSE_BUTTON &&
+        message.type != MESSAGE_MOUSE_WHEEL &&
+        message.type != MESSAGE_MOUSE_MOTION) {
+        return false;
+    }
+
+    return isHostOverrideActive();
+}
+
+void InputControlService::releaseGuestHeldInputs() const {
+    std::lock_guard<std::mutex> lock(_stateMutex);
+
+    for (size_t i = 0; i < _guestKeysDown.size(); ++i) {
+        if (_guestKeysDown[i]) {
+            sendKeyboardInput(static_cast<WORD>(i), KEYEVENTF_KEYUP);
+            _guestKeysDown[i] = false;
+        }
+    }
+
+    if (_guestLeftDown) {
+        sendMouseInput(MOUSEEVENTF_LEFTUP);
+        _guestLeftDown = false;
+    }
+    if (_guestRightDown) {
+        sendMouseInput(MOUSEEVENTF_RIGHTUP);
+        _guestRightDown = false;
+    }
+    if (_guestMiddleDown) {
+        sendMouseInput(MOUSEEVENTF_MIDDLEUP);
+        _guestMiddleDown = false;
+    }
+    if (_guestX1Down) {
+        sendMouseInput(MOUSEEVENTF_XUP, XBUTTON1);
+        _guestX1Down = false;
+    }
+    if (_guestX2Down) {
+        sendMouseInput(MOUSEEVENTF_XUP, XBUTTON2);
+        _guestX2Down = false;
+    }
+}
+
 bool InputControlService::setMousePosition(LONG x, LONG y) const {
     return SetCursorPos(x, y) == TRUE;
 }
@@ -212,6 +348,28 @@ bool InputControlService::keyPress(WORD virtualKey) const {
 }
 
 bool InputControlService::handleParsecMessage(const ParsecMessage& message) const {
+    const bool blockGuestMessage = shouldBlockGuestMessage(message);
+    if (blockGuestMessage) {
+        bool shouldRelease = false;
+        {
+            std::lock_guard<std::mutex> lock(_stateMutex);
+            if (!_wasBlockingGuestInput) {
+                _wasBlockingGuestInput = true;
+                shouldRelease = true;
+            }
+        }
+
+        if (shouldRelease) {
+            releaseGuestHeldInputs();
+        }
+        return true;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(_stateMutex);
+        _wasBlockingGuestInput = false;
+    }
+
     switch (message.type) {
     case MESSAGE_KEYBOARD:
         return handleParsecKeyboard(message.keyboard);
@@ -255,7 +413,12 @@ bool InputControlService::handleParsecKeyboard(const ParsecKeyboardMessage& keyb
         flags |= KEYEVENTF_EXTENDEDKEY;
     }
 
-    return sendKeyboardInput(translation.vk, flags);
+    const bool ok = sendKeyboardInput(translation.vk, flags);
+    if (ok) {
+        std::lock_guard<std::mutex> lock(_stateMutex);
+        _guestKeysDown[translation.vk] = keyboard.pressed;
+    }
+    return ok;
 }
 
 bool InputControlService::handleParsecMouseButton(const ParsecMouseButtonMessage& mouseButton) const {
@@ -264,7 +427,31 @@ bool InputControlService::handleParsecMouseButton(const ParsecMouseButtonMessage
         return false;
     }
 
-    return mouseButton.pressed ? mouseButtonDown(button) : mouseButtonUp(button);
+    const bool ok = mouseButton.pressed ? mouseButtonDown(button) : mouseButtonUp(button);
+    if (ok) {
+        std::lock_guard<std::mutex> lock(_stateMutex);
+        switch (button) {
+        case MouseButton::Left:
+            _guestLeftDown = mouseButton.pressed;
+            break;
+        case MouseButton::Right:
+            _guestRightDown = mouseButton.pressed;
+            break;
+        case MouseButton::Middle:
+            _guestMiddleDown = mouseButton.pressed;
+            break;
+        case MouseButton::X1:
+            _guestX1Down = mouseButton.pressed;
+            break;
+        case MouseButton::X2:
+            _guestX2Down = mouseButton.pressed;
+            break;
+        default:
+            break;
+        }
+    }
+
+    return ok;
 }
 
 bool InputControlService::handleParsecMouseWheel(const ParsecMouseWheelMessage& mouseWheel) const {
@@ -294,5 +481,8 @@ bool InputControlService::handleParsecMouseMotion(const ParsecMouseMotionMessage
         return SendInput(1, &input, sizeof(INPUT)) == 1;
     }
 
-    return setMousePosition(mouseMotion.x, mouseMotion.y);
+    LONG absoluteX = 0;
+    LONG absoluteY = 0;
+    remapAbsoluteMouseToDesktop(mouseMotion.x, mouseMotion.y, absoluteX, absoluteY);
+    return setMousePosition(absoluteX, absoluteY);
 }

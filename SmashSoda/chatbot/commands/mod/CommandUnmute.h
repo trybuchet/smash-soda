@@ -37,7 +37,7 @@ public:
 
 		// Find the guest
 		if (!findGuest()) {
-			setReply("Can't find the guest you want to mute!\0");
+			setReply("Can't find the guest you want to unmute!\0");
 			return false;
 		}
 
@@ -53,12 +53,12 @@ public:
 	 * @return std::vector<const char*>
 	 */
 	static vector<const char*> prefixes() {
-		return vector<const char*> { "!mute" };
+		return vector<const char*> { "!unmute" };
 	}
 
 protected:
 	static vector<const char*> internalPrefixes() {
-		return vector<const char*> { "!mute " };
+		return vector<const char*> { "!unmute " };
 	}
 
 	/**

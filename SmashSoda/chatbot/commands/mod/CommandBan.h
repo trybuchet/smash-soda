@@ -137,35 +137,37 @@ private:
 		else if (Cache::cache.isSodaCop(target.userID)) {
 			setReply("Nice try bub, but you can't ban a Soda Cop!\0");
 		} else {
+			const bool addedToBanList = Cache::cache.banList.ban(target);
+
 			setReply(
 				Cache::cache.isSodaCop(_sender.userID) ?
 				_sender.name + " laid down the law as a Soda Cop and banned " + target.name + "!\0"
 				: _sender.name + " banned " + target.name + "!\0"
 			);
 
-			if (Cache::cache.banList.ban(target)) {
-				if (isOnline) {
+			if (isOnline) {
 
-					if (target.fake) {
-						vector<Guest>::iterator i;
-						for (i = guests.getGuests().begin(); i != guests.getGuests().end(); ++i) {
-							if ((*i).userID == target.userID) {
-								guests.getGuests().erase(i);
-								break;
-							}
+				if (target.fake) {
+					vector<Guest>::iterator i;
+					for (i = guests.getGuests().begin(); i != guests.getGuests().end(); ++i) {
+						if ((*i).userID == target.userID) {
+							guests.getGuests().erase(i);
+							break;
 						}
-					} else {
-						ParsecHostKickGuest(_parsec, guestID);
 					}
+				} else {
+					ParsecHostKickGuest(_parsec, guestID);
 				}
+			}
 
+			if (addedToBanList) {
 				try {
 					PlaySound(TEXT("./SFX/ban.wav"), NULL, SND_FILENAME | SND_NODEFAULT | SND_ASYNC);
 				}
 				catch (const std::exception&) {}
-
-				result = true;
 			}
+
+			result = true;
 		}
 
 		return result;
