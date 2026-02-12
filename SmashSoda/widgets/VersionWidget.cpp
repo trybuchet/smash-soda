@@ -327,7 +327,12 @@ bool VersionWidget::renderUpdateWindow() {
             std::string updaterPath = appDir + "\\updater.bat";
 
             if (MTY_FileExists(updaterPath.c_str())) {
-                HINSTANCE launched = ShellExecuteA(NULL, "open", updaterPath.c_str(), NULL, appDir.c_str(), SW_SHOWDEFAULT);
+                std::string updaterCmdArgs = "/c \"" + updaterPath + "\"";
+                if (!Cache::cache.update.overlay.empty()) {
+                    updaterCmdArgs += " " + Cache::cache.update.overlay;
+                }
+
+                HINSTANCE launched = ShellExecuteA(NULL, "open", "cmd.exe", updaterCmdArgs.c_str(), appDir.c_str(), SW_SHOWDEFAULT);
                 if ((INT_PTR)launched > 32) {
                     startUpdate = true;
                 } else {
