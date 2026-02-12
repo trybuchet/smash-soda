@@ -115,7 +115,7 @@ if %errorlevel% neq 0 (
     winget install -e --id Git.Git --silent --accept-package-agreements --accept-source-agreements
   ) else (
     echo ERROR: winget is required to install Git automatically.
-    echo Please install winget (App Installer) and rerun this updater.
+    echo Please install winget ^(App Installer^) and rerun this updater.
     pause
     exit /b 1
   )
@@ -245,7 +245,7 @@ if %errorlevel% neq 0 (
   where winget >nul 2>&1
   if %errorlevel% neq 0 (
     echo ERROR: winget is required to install CMake automatically.
-    echo Please install winget (App Installer) and rerun this updater.
+    echo Please install winget ^(App Installer^) and rerun this updater.
     pause
     exit /b 1
   )
@@ -371,10 +371,6 @@ echo Cleaning up updater files...
 rmdir /s /q "%WORK%"
 
 echo.
-if exist "%INSTALL_DIR%\SmashSoda.exe" (
-  echo Launching Smash Soda...
-  start "" "%INSTALL_DIR%\SmashSoda.exe"
-) else (
-  echo WARNING: SmashSoda.exe not found at "%INSTALL_DIR%\SmashSoda.exe"
-)
+echo Smash Soda updated! Press any key to exit...
+pause >nul
 exit /b 0

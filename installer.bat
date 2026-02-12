@@ -3,29 +3,32 @@ setlocal EnableExtensions EnableDelayedExpansion
 title Smash Soda Installer
 
 :: --------- Admin check ----------
-net session >nul 2>&1
-if %errorlevel% neq 0 (
-  echo.
-  echo ERROR: This installer must be run as Administrator.
-  echo Attempting to relaunch with admin permissions...
-  echo If you see a User Account Control prompt, click Yes.
-  echo.
-  if not defined SS_ELEVATED (
-    set "SS_ELEVATED=1"
-    if "%~1"=="" (
-      %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass ^
-        -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
-    ) else (
-      %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass ^
-        -Command "Start-Process -FilePath '%~f0' -Verb RunAs -ArgumentList '%*'"
-    )
-    timeout /t 5 >nul
-    exit /b 1
-  ) else (
-    echo UAC was cancelled or elevation failed.
-    echo Please right-click the installer and choose "Run as administrator".
+set "SKIP_ADMIN_CHECK=1"
+if not "%SKIP_ADMIN_CHECK%"=="1" (
+  net session >nul 2>&1
+  if %errorlevel% neq 0 (
     echo.
-    pause >nul
+    echo ERROR: This installer must be run as Administrator.
+    echo Attempting to relaunch with admin permissions...
+    echo If you see a User Account Control prompt, click Yes.
+    echo.
+    if not defined SS_ELEVATED (
+      set "SS_ELEVATED=1"
+      if "%~1"=="" (
+        %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass ^
+          -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+      ) else (
+        %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass ^
+          -Command "Start-Process -FilePath '%~f0' -Verb RunAs -ArgumentList '%*'"
+      )
+      timeout /t 5 >nul
+      exit /b 1
+    ) else (
+      echo UAC was cancelled or elevation failed.
+      echo Please right-click the installer and choose "Run as administrator".
+      echo.
+      pause >nul
+    )
   )
 )
 
@@ -134,7 +137,7 @@ if %errorlevel% neq 0 (
     winget install -e --id Git.Git --silent --accept-package-agreements --accept-source-agreements
   ) else (
     echo ERROR: winget is required to install Git automatically.
-    echo Please install winget (App Installer) and rerun this installer.
+    echo Please install winget ^(App Installer^) and rerun this installer.
     pause
     exit /b 1
   )
@@ -264,7 +267,7 @@ if %errorlevel% neq 0 (
   where winget >nul 2>&1
   if %errorlevel% neq 0 (
     echo ERROR: winget is required to install CMake automatically.
-    echo Please install winget (App Installer) and rerun this installer.
+    echo Please install winget ^(App Installer^) and rerun this installer.
     pause
     exit /b 1
   )
