@@ -121,6 +121,11 @@ bool SettingsWidget::render(bool& showWindow) {
             Config::cfg.Save();
         }
 
+        if (elCheckbox("Text-to-Speech Chat", Config::cfg.chat.ttsEnabled,
+            "Reads incoming visible chat messages aloud using Windows text-to-speech.")) {
+            Config::cfg.Save();
+        }
+
         if (elCheckbox("Disable !bonk", Config::cfg.chat.bonkEnabled,
             "Funny at first, but can quickly turn annoying.")) {
             Config::cfg.Save();

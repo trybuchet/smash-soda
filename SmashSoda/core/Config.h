@@ -112,6 +112,7 @@ public:
 		bool bonkEnabled = true;
 		bool hostBonkProof = false;
 		bool messageNotification = false;
+		bool ttsEnabled = false;
 	};
 
 	class Widgets {

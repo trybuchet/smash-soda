@@ -8,6 +8,7 @@
 #include <mutex>
 #include <functiondiscoverykeys.h>
 #include <Audioclient.h>
+#include <ksmedia.h>
 #include <initguid.h>
 #include "Stringer.h"
 #include "AudioTools.h"
@@ -64,6 +65,13 @@ public:
 
 
 protected:
+	enum class SampleFormat {
+		Unknown,
+		Float32,
+		Int16,
+		Int32
+	};
+
 	void setEDataFlow(EDataFlow eDataFlow);
 	void setStreamFlags(DWORD streamFlags);
 
@@ -73,7 +81,10 @@ protected:
 	DWORD m_streamFlags = AUDCLNT_STREAMFLAGS_LOOPBACK;
 
 	IAudioCaptureClient* m_pCaptureClient = nullptr;
-	size_t m_channels = 2;
+	size_t m_sourceChannels = 2;
+	size_t m_outputChannels = 2;
+	size_t m_bytesPerSample = sizeof(float);
+	SampleFormat m_sampleFormat = SampleFormat::Float32;
 
 
 	vector<AudioSourceDevice> m_devices;
@@ -91,5 +102,3 @@ protected:
 
 	mutex m_mutex;
 };
-
-

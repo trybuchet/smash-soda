@@ -4,8 +4,7 @@
 // ==================================================
 //   Constants
 // ==================================================
-#define AUDIOSRC_BITS 32
-#define AUDIOSRC_BYTES_PER_SAMPLE (AUDIOSRC_BITS/8)
+#define AUDIOSRC_TARGET_CHANNELS 2
 
 
 // ==================================================
@@ -31,6 +30,7 @@ bool AudioSource::setDevice(int index)
 	LPWSTR pwszID = nullptr;
 	IPropertyStore* pProps = nullptr;
 	bool isDefaultFormat = false;
+	WORD bitsPerSample = 0;
 
 	uint32_t freq = 1000;
 
@@ -126,6 +126,50 @@ bool AudioSource::setDevice(int index)
 	freq = (uint32_t)pwfx->nSamplesPerSec;
 	setFrequency((uint32_t) pwfx->nSamplesPerSec);
 
+	// Cache source format so capture path can decode correctly.
+	m_sourceChannels = pwfx->nChannels > 0 ? pwfx->nChannels : 1;
+	m_outputChannels = AUDIOSRC_TARGET_CHANNELS;
+	m_sampleFormat = SampleFormat::Unknown;
+	m_bytesPerSample = 0;
+
+	bitsPerSample = pwfx->wBitsPerSample;
+	if (pwfx->wFormatTag == WAVE_FORMAT_EXTENSIBLE) {
+		const WAVEFORMATEXTENSIBLE* ext = reinterpret_cast<const WAVEFORMATEXTENSIBLE*>(pwfx);
+		bitsPerSample = ext->Samples.wValidBitsPerSample ? ext->Samples.wValidBitsPerSample : pwfx->wBitsPerSample;
+		if (ext->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT && bitsPerSample == 32) {
+			m_sampleFormat = SampleFormat::Float32;
+			m_bytesPerSample = 4;
+		}
+		else if (ext->SubFormat == KSDATAFORMAT_SUBTYPE_PCM) {
+			if (bitsPerSample == 16) {
+				m_sampleFormat = SampleFormat::Int16;
+				m_bytesPerSample = 2;
+			}
+			else if (bitsPerSample == 32) {
+				m_sampleFormat = SampleFormat::Int32;
+				m_bytesPerSample = 4;
+			}
+		}
+	}
+	else if (pwfx->wFormatTag == WAVE_FORMAT_IEEE_FLOAT && bitsPerSample == 32) {
+		m_sampleFormat = SampleFormat::Float32;
+		m_bytesPerSample = 4;
+	}
+	else if (pwfx->wFormatTag == WAVE_FORMAT_PCM) {
+		if (bitsPerSample == 16) {
+			m_sampleFormat = SampleFormat::Int16;
+			m_bytesPerSample = 2;
+		}
+		else if (bitsPerSample == 32) {
+			m_sampleFormat = SampleFormat::Int32;
+			m_bytesPerSample = 4;
+		}
+	}
+
+	if (m_sampleFormat == SampleFormat::Unknown || m_bytesPerSample == 0) {
+		goto EXIT;
+	}
+
 	// Gets the size of the allocated buffer.
 	hr = pAudioClient->GetBufferSize(&bufferFrameCount);
 	FAIL_EXIT(hr);
@@ -140,8 +184,7 @@ bool AudioSource::setDevice(int index)
 	hr = pAudioClient->Start();
 	FAIL_EXIT(hr);
 
-	m_channels = (size_t)pwfx->nChannels;
-	m_maxBufferSize = AUDIOSRC_SAMPLES_PER_BUFFER * m_channels;
+	m_maxBufferSize = AUDIOSRC_SAMPLES_PER_BUFFER * m_outputChannels;
 
 	currentDevice = m_devices[index];
 
@@ -194,83 +237,77 @@ void AudioSource::captureAudio()
 
 		if (flags & AUDCLNT_BUFFERFLAGS_SILENT)
 		{
-			pData = NULL;  // Tells CopyData to write silence.
+			pData = NULL;  // Fill zeros for these frames to preserve cadence.
 		}
 
-		if (pData != NULL)
-		{
-			size_t frameCount = numFramesAvailable;
-			size_t requiredBufferLength = m_channels * frameCount;
-			size_t currentBufferSize = (m_channels >= 2) ? m_buffers[m_activeBuffer].size() : (m_buffers[m_activeBuffer].size() >> 1); // Mirror channel. Mono -> Stereo
+		const size_t frameStride = m_sourceChannels * m_bytesPerSample;
+		if (frameStride == 0) {
+			hr = E_FAIL;
+			FAIL_EXIT(hr);
+		}
 
-			if (currentBufferSize + requiredBufferLength >= m_maxBufferSize)
-			{
-				size_t bufferLengthToFill = m_maxBufferSize - currentBufferSize;
-				size_t bufferLengthLeftover = requiredBufferLength - bufferLengthToFill;
+		auto sampleToInt16 = [&](const BYTE* samplePtr) -> int16_t {
+			float sampleF = 0.0f;
+			switch (m_sampleFormat) {
+			case SampleFormat::Float32:
+				sampleF = *reinterpret_cast<const float*>(samplePtr);
+				break;
+			case SampleFormat::Int16:
+				sampleF = static_cast<float>(*reinterpret_cast<const int16_t*>(samplePtr)) / 32768.0f;
+				break;
+			case SampleFormat::Int32:
+				sampleF = static_cast<float>(*reinterpret_cast<const int32_t*>(samplePtr)) / 2147483648.0f;
+				break;
+			default:
+				sampleF = 0.0f;
+				break;
+			}
 
-				float sampleF;
-				int16_t sampleI;
-				int16_t finalSample;
-				BYTE* p = pData;
-				BYTE* pe = p + bufferLengthToFill * AUDIOSRC_BYTES_PER_SAMPLE;
-				for (; p < pe; p += 4)
-				{
-					sampleF = *(float*)p;
-					sampleI = max(min(sampleF, 1), -1) * 32767.0f;
-					finalSample = isEnabled ? (sampleI * volume) : 0;
-					m_buffers[m_activeBuffer].push_back(finalSample);
+			sampleF = (std::max)(-1.0f, (std::min)(1.0f, sampleF));
+			const int scaled = static_cast<int>(sampleF * 32767.0f * volume);
+			return static_cast<int16_t>((std::max)(-32768, (std::min)(32767, scaled)));
+		};
 
-					if (m_channels < 2)
-					{
-						m_buffers[m_activeBuffer].push_back(finalSample); // Mirror channel. Mono -> Stereo
-					}
-				}
+		auto pushFrame = [&](int16_t left, int16_t right) {
+			if (!isEnabled) {
+				left = 0;
+				right = 0;
+			}
 
+			if (m_buffers[m_activeBuffer].size() + 2 > m_maxBufferSize) {
 				swapBuffers();
 				m_buffers[m_activeBuffer].clear();
 				m_isReady = true;
-
-				pe = p + bufferLengthLeftover * AUDIOSRC_BYTES_PER_SAMPLE;
-				for (; p < pe; p += 4)
-				{
-					sampleF = *(float*)p;
-					sampleI = max(min(sampleF, 1), -1) * 32767.0f;
-					finalSample = isEnabled ? (sampleI * volume) : 0;
-					m_buffers[m_activeBuffer].push_back(finalSample);
-
-					if (m_channels < 2)
-					{
-						m_buffers[m_activeBuffer].push_back(finalSample); // Mirror channel. Mono -> Stereo
-					}
-				}
-			}
-			else
-			{
-				float sampleF;
-				int16_t sampleI;
-				int16_t finalSample;
-				BYTE* p = pData;
-				BYTE* pe = p + requiredBufferLength * AUDIOSRC_BYTES_PER_SAMPLE;
-				for (; p < pe; p += 4)
-				{
-					sampleF = *(float*)p;
-					sampleI = max(min(sampleF, 1), -1) * 32767.0f;
-					finalSample = isEnabled ? (sampleI * volume) : 0;
-					m_buffers[m_activeBuffer].push_back(finalSample);
-
-					if (m_channels < 2)
-					{
-						m_buffers[m_activeBuffer].push_back(finalSample); // Mirror channel. Mono -> Stereo
-					}
-				}
 			}
 
-			if (m_isPlotActive)
-			{
-				for (size_t i = 0; i < m_buffers[m_activeBuffer].size() >> 1; i += 2)
-				{
-					m_plotBuffer[i] = 0.5f * ((float)m_buffers[m_activeBuffer][i << 1] + (float)m_buffers[m_activeBuffer][(i << 1) + 1]);
+			m_buffers[m_activeBuffer].push_back(left);
+			m_buffers[m_activeBuffer].push_back(right);
+		};
+
+		if (pData == NULL) {
+			for (UINT32 frame = 0; frame < numFramesAvailable; ++frame) {
+				pushFrame(0, 0);
+			}
+		}
+		else {
+			for (UINT32 frame = 0; frame < numFramesAvailable; ++frame) {
+				const BYTE* frameData = pData + static_cast<size_t>(frame) * frameStride;
+				const int16_t left = sampleToInt16(frameData);
+				int16_t right = left;
+				if (m_sourceChannels >= 2) {
+					right = sampleToInt16(frameData + m_bytesPerSample);
 				}
+				pushFrame(left, right);
+			}
+		}
+
+		if (m_isPlotActive)
+		{
+			const size_t frameCount = (std::min)(m_buffers[m_activeBuffer].size() / 2, static_cast<size_t>(AUDIOSRC_SAMPLES_PER_BUFFER));
+			for (size_t i = 0; i < frameCount; ++i)
+			{
+				const size_t sampleIndex = i * 2;
+				m_plotBuffer[i] = 0.5f * (static_cast<float>(m_buffers[m_activeBuffer][sampleIndex]) + static_cast<float>(m_buffers[m_activeBuffer][sampleIndex + 1]));
 			}
 		}
 
@@ -441,6 +478,4 @@ void AudioSource::setStreamFlags(DWORD streamFlags)
 {
 	m_streamFlags = streamFlags;
 }
-
-
 

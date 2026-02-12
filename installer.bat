@@ -58,13 +58,6 @@ set "VIGEMBUS_URL=https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0
 :: VS Build Tools 2026 (use aka.ms link which always points to latest stable)
 set "VS_BUILD_TOOLS_URL=https://aka.ms/vs/18/stable/vs_buildtools.exe"
 
-:: Git for Windows (fallback if winget is missing)
-set "GIT_SETUP_URL=https://github.com/git-for-windows/git/releases/download/v2.53.0.windows.1/Git-2.53.0-64-bit.exe"
-
-:: CMake (latest stable 4.x - VS 2026 includes CMake 4.1.2)
-set "CMAKE_VERSION=4.1.2"
-set "CMAKE_MSI_URL=https://github.com/Kitware/CMake/releases/download/v%CMAKE_VERSION%/cmake-%CMAKE_VERSION%-windows-x86_64.msi"
-
 :: --------- Install location (folder picker) ----------
 set "DEFAULT_INSTALL=%ProgramFiles%\Smash Soda"
 echo.
@@ -89,8 +82,6 @@ set "BUILD=%WORK%\build"
 set "OVERLAY_ZIP=%WORK%\smash-glass.zip"
 set "VIGEMBUS_SETUP=%WORK%\ViGEmBus_1.22.0_x64_x86_arm64.exe"
 set "VS_BOOTSTRAP=%WORK%\vs_BuildTools.exe"
-set "CMAKE_MSI=%WORK%\cmake-%CMAKE_VERSION%.msi"
-set "GIT_SETUP=%WORK%\Git-64-bit.exe"
 
 if exist "%WORK%" rmdir /s /q "%WORK%"
 mkdir "%WORK%" "%SRC%" "%BUILD%" 2>nul
@@ -142,11 +133,10 @@ if %errorlevel% neq 0 (
     echo Using winget to install Git...
     winget install -e --id Git.Git --silent --accept-package-agreements --accept-source-agreements
   ) else (
-    echo Downloading Git installer...
-    call :download "%GIT_SETUP_URL%" "%GIT_SETUP%" "Git for Windows"
-    echo Installing Git...
-    "%GIT_SETUP%" /VERYSILENT /NORESTART /SP- /SUPPRESSMSGBOXES
-    timeout /t 5 >nul
+    echo ERROR: winget is required to install Git automatically.
+    echo Please install winget (App Installer) and rerun this installer.
+    pause
+    exit /b 1
   )
 )
 
@@ -268,25 +258,24 @@ echo C++ build environment is ready.
 
 :: --------- Install CMake ----------
 echo.
-echo [3/8] Installing CMake %CMAKE_VERSION%...
+echo [3/8] Installing CMake...
 where cmake >nul 2>&1
 if %errorlevel% neq 0 (
-  call :download "%CMAKE_MSI_URL%" "%CMAKE_MSI%" "CMake %CMAKE_VERSION%"
-  if not exist "%CMAKE_MSI%" (
-    echo ERROR: CMake installer was not downloaded.
+  where winget >nul 2>&1
+  if %errorlevel% neq 0 (
+    echo ERROR: winget is required to install CMake automatically.
+    echo Please install winget (App Installer) and rerun this installer.
     pause
     exit /b 1
   )
-  echo Installing CMake...
-  msiexec /i "%CMAKE_MSI%" /qn /norestart ADD_CMAKE_TO_PATH=System
-  
-  :: Wait for installation
-  timeout /t 10 >nul
-  
-  :: Add CMake to PATH manually if needed
-  if exist "%ProgramFiles%\CMake\bin\cmake.exe" (
-    set "PATH=%ProgramFiles%\CMake\bin;%PATH%"
-  )
+  echo Using winget to install CMake...
+  winget install -e --id Kitware.CMake --silent --accept-package-agreements --accept-source-agreements
+  timeout /t 5 >nul
+)
+
+:: Add CMake to PATH manually if needed
+if exist "%ProgramFiles%\CMake\bin\cmake.exe" (
+  set "PATH=%ProgramFiles%\CMake\bin;%PATH%"
 )
 
 :: Verify CMake

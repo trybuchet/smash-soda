@@ -16,6 +16,74 @@ using namespace std;
 	#endif
 #endif
 
+namespace {
+	std::wstring utf8ToWide(const std::string& text) {
+		if (text.empty()) {
+			return std::wstring();
+		}
+
+		int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, nullptr, 0);
+		if (sizeNeeded <= 0) {
+			return std::wstring();
+		}
+
+		std::wstring wide(static_cast<size_t>(sizeNeeded), L'\0');
+		MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, &wide[0], sizeNeeded);
+		if (!wide.empty() && wide.back() == L'\0') {
+			wide.pop_back();
+		}
+		return wide;
+	}
+
+	void speakChatMessageAsync(const std::string& speaker, const std::string& message) {
+		if (message.empty()) {
+			return;
+		}
+
+		std::thread([speaker, message]() {
+			HRESULT initHr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+			const bool comReady = SUCCEEDED(initHr) || initHr == RPC_E_CHANGED_MODE;
+			const bool shouldUninitialize = SUCCEEDED(initHr);
+			if (!comReady) {
+				return;
+			}
+
+			CLSID clsid = {};
+			HRESULT hr = CLSIDFromProgID(L"SAPI.SpVoice", &clsid);
+			if (SUCCEEDED(hr)) {
+				IDispatch* voice = nullptr;
+				hr = CoCreateInstance(clsid, nullptr, CLSCTX_ALL, IID_IDispatch, reinterpret_cast<void**>(&voice));
+				if (SUCCEEDED(hr) && voice != nullptr) {
+					const std::wstring line = utf8ToWide(speaker + " says " + message);
+					if (!line.empty()) {
+						OLECHAR* speakName = const_cast<OLECHAR*>(L"Speak");
+						DISPID speakDispId = DISPID_UNKNOWN;
+						hr = voice->GetIDsOfNames(IID_NULL, &speakName, 1, LOCALE_USER_DEFAULT, &speakDispId);
+						if (SUCCEEDED(hr)) {
+							VARIANT arg;
+							VariantInit(&arg);
+							arg.vt = VT_BSTR;
+							arg.bstrVal = SysAllocString(line.c_str());
+							if (arg.bstrVal != nullptr) {
+								DISPPARAMS params = {};
+								params.rgvarg = &arg;
+								params.cArgs = 1;
+								voice->Invoke(speakDispId, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &params, nullptr, nullptr, nullptr);
+								SysFreeString(arg.bstrVal);
+							}
+						}
+					}
+					voice->Release();
+				}
+			}
+
+			if (shouldUninitialize) {
+				CoUninitialize();
+			}
+		}).detach();
+	}
+}
+
 // ============================================================
 // 
 //  PUBLIC
@@ -722,6 +790,9 @@ void Hosting::handleMessage(const char* message, Guest& guest, bool isHost, bool
 
 		if (!defaultMessage.getReply().empty() && !isHidden) {
 			broadcastChatMessage(defaultMessage.getReply());
+			if (Config::cfg.chat.ttsEnabled && !isHost && !outside) {
+				speakChatMessageAsync(guest.name, message);
+			}
 
 			string adjustedMessage = defaultMessage.getReply();
 			Stringer::replacePatternOnce(adjustedMessage, "%", "%%");

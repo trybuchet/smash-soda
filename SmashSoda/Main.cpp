@@ -292,20 +292,17 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
         ImGui::SetMouseCursor(ImGuiMouseCursor_Arrow);
 
         versionWidget.render();
-        if (versionWidget.showUpdate) {
+        
+        if (Cache::cache.showParsecLogin) {
+            loginWindow.render(Cache::cache.showParsecLogin);
+        }
+        else if (versionWidget.showUpdate) {
             if (versionWidget.renderUpdateWindow()) {
                 ::PostMessage(hwnd, WM_CLOSE, 0, 0);
             }
         }
         else if (Config::cfg.arcade.showLogin) {
             versionWidget.renderLoginWindow();
-        }
-        else if (Config::cfg.overlay.update) {
-            versionWidget.renderDownloadWindow();
-        }
-
-        if (Cache::cache.showParsecLogin) {
-            loginWindow.render(Cache::cache.showParsecLogin);
         }
         else
         {

@@ -35,27 +35,20 @@ echo Smash Soda Updater
 echo ==========================================================
 echo This updater will download build tools if needed and
 echo compile Smash Soda from source.
-echo.
-echo Install location is the folder this updater is run from.
 echo ==========================================================
 echo.
-echo Press any key to continue...
-pause >nul
 
 :: --------- Config ----------
 set "BRANCH=preview"
 set "REPO_URL=https://github.com/trybuchet/smash-soda.git"
-set "SMASH_GLASS_URL=https://github.com/trybuchet/smash-soda-overlay/releases/download/4.0.0/smash-glass.zip"
+set "SMASH_GLASS_VERSION=%~1"
+set "SMASH_GLASS_URL="
+if defined SMASH_GLASS_VERSION (
+  set "SMASH_GLASS_URL=https://github.com/trybuchet/smash-soda-overlay/releases/download/%SMASH_GLASS_VERSION%/smash-glass.zip"
+)
 
 :: VS Build Tools 2026 (use aka.ms link which always points to latest stable)
 set "VS_BUILD_TOOLS_URL=https://aka.ms/vs/18/stable/vs_buildtools.exe"
-
-:: Git for Windows (fallback if winget is missing)
-set "GIT_SETUP_URL=https://github.com/git-for-windows/git/releases/download/v2.53.0.windows.1/Git-2.53.0-64-bit.exe"
-
-:: CMake (latest stable 4.x - VS 2026 includes CMake 4.1.2)
-set "CMAKE_VERSION=4.1.2"
-set "CMAKE_MSI_URL=https://github.com/Kitware/CMake/releases/download/v%CMAKE_VERSION%/cmake-%CMAKE_VERSION%-windows-x86_64.msi"
 
 :: --------- Install location (script folder) ----------
 set "INSTALL_DIR=%~dp0"
@@ -70,8 +63,6 @@ set "BUILD=%WORK%\build"
 set "OVERLAY_ZIP=%WORK%\smash-glass.zip"
 set "OVERLAY_EXTRACT=%WORK%\overlay-extract"
 set "VS_BOOTSTRAP=%WORK%\vs_BuildTools.exe"
-set "CMAKE_MSI=%WORK%\cmake-%CMAKE_VERSION%.msi"
-set "GIT_SETUP=%WORK%\Git-64-bit.exe"
 
 if exist "%WORK%" rmdir /s /q "%WORK%"
 mkdir "%WORK%" "%SRC%" "%BUILD%" 2>nul
@@ -123,11 +114,10 @@ if %errorlevel% neq 0 (
     echo Using winget to install Git...
     winget install -e --id Git.Git --silent --accept-package-agreements --accept-source-agreements
   ) else (
-    echo Downloading Git installer...
-    call :download "%GIT_SETUP_URL%" "%GIT_SETUP%" "Git for Windows"
-    echo Installing Git...
-    "%GIT_SETUP%" /VERYSILENT /NORESTART /SP- /SUPPRESSMSGBOXES
-    timeout /t 5 >nul
+    echo ERROR: winget is required to install Git automatically.
+    echo Please install winget (App Installer) and rerun this updater.
+    pause
+    exit /b 1
   )
 )
 
@@ -249,25 +239,24 @@ echo C++ build environment is ready.
 
 :: --------- Install CMake ----------
 echo.
-echo [3/7] Installing CMake %CMAKE_VERSION%...
+echo [3/7] Installing CMake...
 where cmake >nul 2>&1
 if %errorlevel% neq 0 (
-  call :download "%CMAKE_MSI_URL%" "%CMAKE_MSI%" "CMake %CMAKE_VERSION%"
-  if not exist "%CMAKE_MSI%" (
-    echo ERROR: CMake installer was not downloaded.
+  where winget >nul 2>&1
+  if %errorlevel% neq 0 (
+    echo ERROR: winget is required to install CMake automatically.
+    echo Please install winget (App Installer) and rerun this updater.
     pause
     exit /b 1
   )
-  echo Installing CMake...
-  msiexec /i "%CMAKE_MSI%" /qn /norestart ADD_CMAKE_TO_PATH=System
-  
-  :: Wait for installation
-  timeout /t 10 >nul
-  
-  :: Add CMake to PATH manually if needed
-  if exist "%ProgramFiles%\CMake\bin\cmake.exe" (
-    set "PATH=%ProgramFiles%\CMake\bin;%PATH%"
-  )
+  echo Using winget to install CMake...
+  winget install -e --id Kitware.CMake --silent --accept-package-agreements --accept-source-agreements
+  timeout /t 5 >nul
+)
+
+:: Add CMake to PATH manually if needed
+if exist "%ProgramFiles%\CMake\bin\cmake.exe" (
+  set "PATH=%ProgramFiles%\CMake\bin;%PATH%"
 )
 
 :: Verify CMake
@@ -343,34 +332,38 @@ if %errorlevel% neq 0 (
 
 :: --------- Smash Glass Overlay ----------
 echo.
-echo Installing Smash Glass overlay...
-set "OVERLAY_DIR=%INSTALL_DIR%\overlay"
-mkdir "%OVERLAY_DIR%" 2>nul
-if exist "%OVERLAY_EXTRACT%" rmdir /s /q "%OVERLAY_EXTRACT%"
-mkdir "%OVERLAY_EXTRACT%" 2>nul
-call :download "%SMASH_GLASS_URL%" "%OVERLAY_ZIP%" "Smash Glass"
-%PS% -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%OVERLAY_ZIP%' -DestinationPath '%OVERLAY_EXTRACT%' -Force"
-del /f /q "%OVERLAY_ZIP%" >nul 2>&1
+set "OVERLAY_STATUS=Overlay update skipped (no version argument provided)."
+if defined SMASH_GLASS_VERSION (
+  echo Installing Smash Glass overlay version %SMASH_GLASS_VERSION%...
+  set "OVERLAY_DIR=%INSTALL_DIR%\overlay"
+  mkdir "%OVERLAY_DIR%" 2>nul
+  if exist "%OVERLAY_EXTRACT%" rmdir /s /q "%OVERLAY_EXTRACT%"
+  mkdir "%OVERLAY_EXTRACT%" 2>nul
+  call :download "%SMASH_GLASS_URL%" "%OVERLAY_ZIP%" "Smash Glass %SMASH_GLASS_VERSION%"
+  %PS% -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%OVERLAY_ZIP%' -DestinationPath '%OVERLAY_EXTRACT%' -Force"
+  del /f /q "%OVERLAY_ZIP%" >nul 2>&1
 
-:: Copy overlay files but preserve user's plugins and themes folders
-robocopy "%OVERLAY_EXTRACT%" "%OVERLAY_DIR%" /E /XO /NFL /NDL /NJH /NJS /NP /XD "plugins" "themes" >nul
-if %errorlevel% GEQ 8 (
-  echo ERROR: Failed to update overlay files.
-  pause
-  exit /b 1
+  :: Copy overlay files but preserve user's plugins and themes folders
+  robocopy "%OVERLAY_EXTRACT%" "%OVERLAY_DIR%" /E /XO /NFL /NDL /NJH /NJS /NP /XD "plugins" "themes" >nul
+  if %errorlevel% GEQ 8 (
+    echo ERROR: Failed to update overlay files.
+    pause
+    exit /b 1
+  )
+  if exist "%OVERLAY_EXTRACT%" rmdir /s /q "%OVERLAY_EXTRACT%"
+
+  :: Unblock overlay files
+  %PS% -NoProfile -ExecutionPolicy Bypass -Command ^
+    "Get-ChildItem -Path '%OVERLAY_DIR%' -Recurse | Where-Object { $_.FullName -notlike '*\\plugins\\*' -and $_.FullName -notlike '*\\themes\\*' } | Unblock-File"
+  set "OVERLAY_STATUS=Overlay installed at: %OVERLAY_DIR%"
 )
-if exist "%OVERLAY_EXTRACT%" rmdir /s /q "%OVERLAY_EXTRACT%"
-
-:: Unblock overlay files
-%PS% -NoProfile -ExecutionPolicy Bypass -Command ^
-  "Get-ChildItem -Path '%OVERLAY_DIR%' -Recurse | Where-Object { $_.FullName -notlike '*\\plugins\\*' -and $_.FullName -notlike '*\\themes\\*' } | Unblock-File"
 
 echo.
 echo ============================================================
 echo UPDATE COMPLETE!
 echo ============================================================
 echo Smash Soda updated at: "%INSTALL_DIR%"
-echo Overlay installed at: "%OVERLAY_DIR%"
+echo %OVERLAY_STATUS%
 echo ============================================================
 echo.
 
@@ -378,6 +371,10 @@ echo Cleaning up updater files...
 rmdir /s /q "%WORK%"
 
 echo.
-echo Press any key to exit...
-pause >nul
+if exist "%INSTALL_DIR%\SmashSoda.exe" (
+  echo Launching Smash Soda...
+  start "" "%INSTALL_DIR%\SmashSoda.exe"
+) else (
+  echo WARNING: SmashSoda.exe not found at "%INSTALL_DIR%\SmashSoda.exe"
+)
 exit /b 0

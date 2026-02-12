@@ -95,6 +95,9 @@ void Config::Load() {
 			cfg.chat.bonkEnabled = setValue(cfg.chat.bonkEnabled, j["Chat"]["bonkEnabled"].get<bool>());
 			cfg.chat.hostBonkProof = setValue(cfg.chat.hostBonkProof, j["Chat"]["hostBonkProof"].get<bool>());
 			cfg.chat.messageNotification = setValue(cfg.chat.messageNotification, j["Chat"]["messageNotification"].get<bool>());
+			if (j.contains("Chat") && j["Chat"].contains("ttsEnabled")) {
+				cfg.chat.ttsEnabled = setValue(cfg.chat.ttsEnabled, j["Chat"]["ttsEnabled"].get<bool>());
+			}
 
 			// Set Widgets properties
 			cfg.widgets.host = setValue(cfg.widgets.host, j["Widgets"]["host"].get<bool>());
@@ -287,7 +290,8 @@ void Config::Save() {
 		{"welcomeMessage", cfg.chat.welcomeMessage},
 		{"bonkEnabled", cfg.chat.bonkEnabled},
 		{"hostBonkProof", cfg.chat.hostBonkProof},
-		{"messageNotification", cfg.chat.messageNotification}
+		{"messageNotification", cfg.chat.messageNotification},
+		{"ttsEnabled", cfg.chat.ttsEnabled}
 	};
 
 	// Widgets

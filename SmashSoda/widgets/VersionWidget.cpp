@@ -314,7 +314,7 @@ bool VersionWidget::renderUpdateWindow() {
     static std::string updateError = "";
 
     ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.5f - 45);
-    if (ImGui::Button("Update Now")) {
+    if (elBtn("Update")) {
         updateError = "";
 
         char exePath[MAX_PATH] = {};
