@@ -38,9 +38,9 @@ ACommand* ChatBot::identifyUserDataMessage(const char* msg, Guest& sender, bool 
 		return new Command8Ball(msg, sender);
 	}
 
-	if (isCommand(msg, CommandBB::prefixes())) {
-		return new CommandBB(msg, sender, GamepadClient::instance, _macro);
-	}
+		if (isCommand(msg, CommandBB::prefixes())) {
+			return new CommandBB(msg, sender, GamepadClient::instance, _macro, isHost);
+		}
 
 	if (isCommand(msg, CommandBonk::prefixes())) {
 		return new CommandBonk(msg, sender, _guests, _host);

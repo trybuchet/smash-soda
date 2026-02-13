@@ -39,7 +39,7 @@ echo ==========================================================
 echo.
 
 :: --------- Config ----------
-set "BRANCH=preview"
+set "BRANCH=master"
 set "REPO_URL=https://github.com/trybuchet/smash-soda.git"
 set "SMASH_GLASS_VERSION=%~1"
 set "SMASH_GLASS_URL="

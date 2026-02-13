@@ -21,8 +21,8 @@ public:
 	 * @param macro 
 	 * @param sender 
 	 */
-	CommandBB(const char* msg, Guest& sender, GamepadClient& gamepadClient, Macro& macro)
-		: ACommand(msg, sender), _gamepadClient(gamepadClient), _macro(macro), _sender(sender)
+	CommandBB(const char* msg, Guest& sender, GamepadClient& gamepadClient, Macro& macro, bool isHost = false)
+		: ACommand(msg, sender), _gamepadClient(gamepadClient), _macro(macro), _sender(sender), _isHost(isHost)
 	{}
 
 	/**
@@ -55,8 +55,12 @@ protected:
 	GamepadClient& _gamepadClient;
 	Macro& _macro;
 	Guest& _sender;
+	bool _isHost = false;
 
 	bool hasPermission() {
+		if (_isHost) {
+			return true;
+		}
 		Tier tier = Cache::cache.tierList.getTier(_sender.userID);
 		if (tier == Tier::MOD || tier == Tier::GOD ||
 			Cache::cache.vipList.isVIP(_sender.userID)) {
