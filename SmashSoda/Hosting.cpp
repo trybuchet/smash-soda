@@ -1,0 +1,1745 @@
+#include "Hosting.h"
+#include "services/OverlayService.h"
+#include "services/InputControlService.h"
+#include "services/GuestStateStore.h"
+
+using namespace std;
+
+#if defined(_WIN32)
+	#if !defined(BITS)
+		#define BITS 64
+	#endif
+	#if (BITS == 64)
+		#define SDK_PATH "./parsec.dll"
+	#else
+		#define SDK_PATH "./parsec32.dll"
+	#endif
+#endif
+
+namespace {
+	std::wstring utf8ToWide(const std::string& text) {
+		if (text.empty()) {
+			return std::wstring();
+		}
+
+		int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, nullptr, 0);
+		if (sizeNeeded <= 0) {
+			return std::wstring();
+		}
+
+		std::wstring wide(static_cast<size_t>(sizeNeeded), L'\0');
+		MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, &wide[0], sizeNeeded);
+		if (!wide.empty() && wide.back() == L'\0') {
+			wide.pop_back();
+		}
+		return wide;
+	}
+
+	void speakChatMessageAsync(const std::string& speaker, const std::string& message) {
+		if (message.empty()) {
+			return;
+		}
+
+		std::thread([speaker, message]() {
+			HRESULT initHr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+			const bool comReady = SUCCEEDED(initHr) || initHr == RPC_E_CHANGED_MODE;
+			const bool shouldUninitialize = SUCCEEDED(initHr);
+			if (!comReady) {
+				return;
+			}
+
+			CLSID clsid = {};
+			HRESULT hr = CLSIDFromProgID(L"SAPI.SpVoice", &clsid);
+			if (SUCCEEDED(hr)) {
+				IDispatch* voice = nullptr;
+				hr = CoCreateInstance(clsid, nullptr, CLSCTX_ALL, IID_IDispatch, reinterpret_cast<void**>(&voice));
+				if (SUCCEEDED(hr) && voice != nullptr) {
+					const std::wstring line = utf8ToWide(speaker + " says " + message);
+					if (!line.empty()) {
+						OLECHAR* speakName = const_cast<OLECHAR*>(L"Speak");
+						DISPID speakDispId = DISPID_UNKNOWN;
+						hr = voice->GetIDsOfNames(IID_NULL, &speakName, 1, LOCALE_USER_DEFAULT, &speakDispId);
+						if (SUCCEEDED(hr)) {
+							VARIANT arg;
+							VariantInit(&arg);
+							arg.vt = VT_BSTR;
+							arg.bstrVal = SysAllocString(line.c_str());
+							if (arg.bstrVal != nullptr) {
+								DISPPARAMS params = {};
+								params.rgvarg = &arg;
+								params.cArgs = 1;
+								voice->Invoke(speakDispId, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &params, nullptr, nullptr, nullptr);
+								SysFreeString(arg.bstrVal);
+							}
+						}
+					}
+					voice->Release();
+				}
+			}
+
+			if (shouldUninitialize) {
+				CoUninitialize();
+			}
+		}).detach();
+	}
+}
+
+// ============================================================
+// 
+//  PUBLIC
+// 
+// ============================================================
+
+Hosting::Hosting() {
+
+	// Create a random 8 character string
+	_roomToken = "";
+	
+	_hostConfig = EMPTY_HOST_CONFIG;
+	setHostConfig(
+		"",
+		"",
+		Config::cfg.room.guestLimit,
+		false,
+		Config::cfg.room.secret
+	);
+	setHostVideoConfig(Config::cfg.video.fps, Config::cfg.video.bandwidth);
+	
+	_tierList.loadTiers();
+	_tierList.saveTiers();
+
+	_parsec = nullptr;
+
+	SDL_Init(SDL_INIT_JOYSTICK);
+	MasterOfPuppets::instance.init();
+	MasterOfPuppets::instance.start();
+
+	_disableGuideButton = Config::cfg.input.disableGuideButton;
+	_disableKeyboard = Config::cfg.input.disableKeyboard;
+	_lockedGamepad.bLeftTrigger = Config::cfg.input.lockedGamepadLeftTrigger;
+	_lockedGamepad.bRightTrigger = Config::cfg.input.lockedGamepadRightTrigger;
+	_lockedGamepad.sThumbLX = Config::cfg.input.lockedGamepadLX;
+	_lockedGamepad.sThumbLY = Config::cfg.input.lockedGamepadLY;
+	_lockedGamepad.sThumbRX = Config::cfg.input.lockedGamepadRX;
+	_lockedGamepad.sThumbRY = Config::cfg.input.lockedGamepadRY;
+	_lockedGamepad.wButtons = Config::cfg.input.lockedGamepadButtons;
+	
+}
+
+/**
+ * Initializes the hosting system.
+ */
+void Hosting::init() {
+	
+	_parsecStatus = ParsecInit(NULL, NULL, (char *)SDK_PATH, &_parsec);
+	_dx11.init();
+	GuestStateStore::instance().load();
+	
+	// Apply saved resolution scaling setting
+	if (Config::cfg.video.resolutionIndex > 0 && Config::cfg.video.resolutionIndex < Config::cfg.resolutions.size()) {
+		int width = Config::cfg.resolutions[Config::cfg.video.resolutionIndex].width;
+		int height = Config::cfg.resolutions[Config::cfg.video.resolutionIndex].height;
+		_dx11.setTargetResolution(width, height);
+	}
+	
+	GamepadClient::instance.setParsec(_parsec);
+	GamepadClient::instance.init();
+
+	std::thread([this]() {
+		GamepadClient::instance.createAllGamepads();
+		_macro.init();
+	}).detach();
+
+	audioOut.fetchDevices();
+	vector<AudioSourceDevice> audioOutDevices = audioOut.getDevices();
+	if (Config::cfg.audio.outputDevice >= audioOutDevices.size()) {
+		Config::cfg.audio.outputDevice = 0;
+	}
+	audioOut.setDevice(Config::cfg.audio.outputDevice);
+	audioOut.captureAudio();
+	audioOut.volume = Config::cfg.audio.speakersVolume;
+
+	audioIn.fetchDevices();
+	vector<AudioSourceDevice> audioInputDevices = audioIn.getDevices();
+	if (Config::cfg.audio.inputDevice >= audioInputDevices.size()) {
+		Config::cfg.audio.inputDevice = 0;
+	}
+	audioIn.setDevice(Config::cfg.audio.inputDevice);
+	audioIn.captureAudio();
+	audioIn.volume = Config::cfg.audio.micVolume;
+	_parsecSession.loadSessionCache();
+
+	fetchAccountData();
+
+	_chatBot = new ChatBot(
+		audioIn, audioOut, _dx11,
+		GuestList::instance, _guestHistory, _parsec,
+		_hostConfig, _parsecSession,
+		_macro, _isRunning, _host, _hotseat
+	);
+
+	CommandBonk::init();
+
+	// Parsec Logs
+	ParsecSetLogCallback(_parsec, Hosting::LogCallback, this);
+
+	if (Config::cfg.socket.enabled) {
+		WebSocket::instance.createServer(Config::cfg.socket.port);
+	}
+
+	// Make 20 fake guests
+	//addFakeGuests(20);
+	
+}
+
+/**
+ * Handles logs generated by the Parsec SDK.
+ * @param level The log level.
+ * @param msg The log message.
+ * @param opaque The opaque data.
+ */
+void Hosting::LogCallback(ParsecLogLevel level, const char *msg, void *opaque) {
+	Hosting* self = static_cast<Hosting*>(opaque);
+	if (Config::cfg.general.parsecLogs) {
+		self->logMessage(msg);
+	}
+
+	// Try to find the IP address in the log message
+	std::string message(msg);
+    std::size_t start = message.find("BUD|");
+    if (start != std::string::npos) {
+        start += 4; // Skip "BUD|"
+        std::size_t end = message.find("|", start);
+        if (end != std::string::npos) {
+            std::string ipAddressWithPrefix = message.substr(start, end - start);
+            std::size_t ipStart = ipAddressWithPrefix.find("::ffff:");
+            if (ipStart != std::string::npos) {
+                ipStart += 7; // Skip "::ffff:"
+                std::string ipAddress = ipAddressWithPrefix.substr(ipStart);
+                Cache::cache.pendingIpAddress = ipAddress;
+            }
+        }
+    }
+}
+
+/**
+ * Applies the current host configuration to the running session.
+ */
+void Hosting::applyHostConfig() {
+	if (isRunning()){
+		ParsecHostSetConfig(_parsec, &_hostConfig, _parsecSession.sessionId.c_str());
+	}
+}
+
+/**
+ * Broadcasts a chat message to all connected guests.
+ * @param message The chat message to broadcast.
+ */
+void Hosting::broadcastChatMessage(string message) {
+	vector<Guest> guests = GuestList::instance.getGuests();
+	vector<Guest>::iterator gi;
+
+	for (gi = guests.begin(); gi != guests.end(); ++gi)
+	{
+		ParsecHostSendUserData(_parsec, (*gi).id, HOSTING_CHAT_MSG_ID, message.c_str());
+	}
+}
+
+/**
+ * Broadcasts a chat message to all connected guests and logs the command.
+ * @param message The chat message to broadcast and log.
+ */
+void Hosting::broadcastChatMessageAndLogCommand(string message) {
+	broadcastChatMessage(message);
+	_chatLog.logCommand(message);
+}
+
+/**
+ * Releases the hosting system and stops all related threads.
+ */
+void Hosting::release() {
+	stopHosting();
+	while (_isRunning)
+	{
+		Sleep(5);
+	}
+	_dx11.clear();
+	GamepadClient::instance.release();
+	MasterOfPuppets::instance.stop();
+	if (WebSocket::instance.isRunning()) {
+		WebSocket::instance.stopServer();
+	}
+}
+
+/**
+ * Checks if the hosting system is ready.
+ * @return True if ready, false otherwise.
+ */
+bool Hosting::isReady() {	
+	return _parsecStatus == PARSEC_OK;
+}
+
+/**
+ * Checks if hosting is currently running.
+ * @return True if hosting is running, false otherwise.
+ */
+bool Hosting::isRunning() {
+	return _isTestMode || _isRunning;
+}
+
+/**
+ * Gets the host guest object.
+ * @return The host guest object.
+ */
+Guest& Hosting::getHost() {
+	return _host;
+}
+
+/**
+ * Gets the Parsec session object.
+ * @return The Parsec session object.
+ */
+ParsecSession& Hosting::getSession() {
+	return _parsecSession;
+}
+
+/**
+ * Fetches account data for the host.
+ * @param sync If true, fetches data synchronously; otherwise, asynchronously.
+ */
+void Hosting::fetchAccountData(bool sync) {
+	_host.name = "Host";
+	_host.status = Guest::Status::INVALID;
+	if (isReady()) {
+		if (sync) {
+			_parsecSession.fetchAccountDataSync(&_host);
+		}
+		else {
+			_parsecSession.fetchAccountData(&_host);
+		}
+	}
+}
+
+/**
+ * Gets the current host configuration.
+ * @return The current Parsec host configuration.
+ */
+ParsecHostConfig& Hosting::getHostConfig() {
+	return _hostConfig;
+}
+
+/**
+ * Resizes the hosting room to the specified maximum number of guests.
+ * @param maxGuests The new maximum number of guests.
+ * @return True if the room was resized successfully, false otherwise.
+ */
+bool Hosting::resizeRoom(uint32_t maxGuests) {
+	if (isRunning()) {
+
+		if (maxGuests > 20) {
+			maxGuests = 20;
+		}
+		if (maxGuests < 1) {
+			maxGuests = 1;
+		}
+
+		_hostConfig.maxGuests = maxGuests;
+		Config::cfg.room.guestLimit = maxGuests;
+		Config::cfg.Save();
+		ParsecHostSetConfig(_parsec, &_hostConfig, _parsecSession.sessionId.c_str());
+		Arcade::instance.createPost();
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Gets the DX11 graphics handler.
+ * @return The DX11 graphics handler.
+ */
+DX11& Hosting::getDX11() {
+	return _dx11;
+}
+
+/**
+ * Gets the chat bot instance.
+ * @return The chat bot instance.
+ */
+ChatBot* Hosting::getChatBot() {
+	return _chatBot;
+}
+
+/**
+ * Gets the message log.
+ * @return The message log.
+ */
+vector<string>& Hosting::getMessageLog() {
+	return _chatLog.getMessageLog();
+}
+
+/**
+ * Gets the command log.
+ * @return The command log.
+ */
+vector<string>& Hosting::getCommandLog() {
+	return _chatLog.getCommandLog();
+}
+
+/**
+ * Gets the list of connected guests.
+ * @return The list of connected guests.
+ */
+vector<Guest>& Hosting::getGuests() {
+	return GuestList::instance.getGuests();
+}
+
+bool Hosting::setGuestInputPermissions(uint32_t userID, bool allowKeyboard, bool allowMouse) {
+	Guest guest;
+	if (!GuestList::instance.find(userID, &guest)) {
+		return false;
+	}
+
+	ParsecPermissions perms{};
+	perms.gamepad = guest.allowGamepadInput;
+	perms.keyboard = allowKeyboard;
+	perms.mouse = allowMouse;
+
+	const ParsecStatus status = ParsecHostSetPermissions(_parsec, guest.id, &perms);
+	GuestList::instance.setInputPermissions(userID, perms.gamepad, perms.keyboard, perms.mouse);
+
+	if (status != PARSEC_OK) {
+		logMessage("Failed to update SDK input permissions for " + guest.name + " (status " + to_string(status) + "). Using local permission state.");
+	}
+
+	GuestStateStore::instance().setGuestInputPermissions(userID, perms.gamepad, perms.keyboard, perms.mouse);
+	GuestStateStore::instance().save();
+
+	return status == PARSEC_OK;
+}
+
+/**
+ * Gets the list of guests who are currently playing.
+ * @return The list of playing guests.
+ */
+vector<Guest> Hosting::getPlayingGuests() {
+	return GuestList::instance.getPlayingGuests();
+}
+
+/**
+ * Gets a random selection of guests.
+ * @return A vector of random guests.
+ */
+vector<Guest> Hosting::getRandomGuests() {
+	return GuestList::instance.getRandomGuests();
+}
+
+/**
+ * Gets a guest by their ID.
+ * @param id The ID of the guest to retrieve.
+ * @return The guest with the specified ID.
+ */
+Guest& Hosting::getGuest(uint32_t id) {
+	
+	// For each guest in the guest list
+	for (Guest& guest : GuestList::instance.getGuests()) {
+
+		// If the guest ID matches the target ID
+		if (guest.id == id) {
+
+			// Return the guest
+			return guest;
+		}
+	}
+	
+}
+
+/**
+ * Gets the index of a guest by their ID.
+ * @param id The ID of the guest to find.
+ * @return The index of the guest with the specified ID, or -1 if not found.
+ */
+int Hosting::getGuestIndex(uint32_t id) {
+
+	// For each guest in the guest list
+	for (int i = 0; i < GuestList::instance.getGuests().size(); i++) {
+
+		// If the guest ID matches the target ID
+		if (GuestList::instance.getGuests()[i].userID == id) {
+
+			// Return the guest
+			return i;
+		}
+	}
+
+	return -1;
+
+}
+
+/**
+ * Checks if a guest with the specified ID exists.
+ * @param id The ID of the guest to check.
+ * @return True if the guest exists, false otherwise.
+ */
+bool Hosting::guestExists(uint32_t id) {
+	for (Guest& guest : GuestList::instance.getGuests()) {
+		if (guest.id == id) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Gets a list of guests after a specified guest ID.
+ * @param targetGuestID The ID of the target guest.
+ * @param count The number of guests to retrieve.
+ * @param ignoreSpectators Whether to ignore spectators.
+ * @return A vector of guests after the specified guest ID.
+ */
+vector<Guest> Hosting::getGuestsAfterGuest(uint32_t targetGuestID, int count, bool ignoreSpectators) {
+	return GuestList::instance.getGuestsAfterGuest(targetGuestID, count, ignoreSpectators);
+}
+
+/**
+ * Gets the guest history.
+ * @return A vector of guest data representing the guest history.
+ */
+vector<GuestData>& Hosting::getGuestHistory() {
+	return _guestHistory.getGuests();
+}
+
+/**
+ * Gets the metrics for a specific guest by their ID.
+ * @param id The ID of the guest.
+ * @return The metrics for the specified guest.
+ */
+MyMetrics Hosting::getMetrics(uint32_t id) {
+	return GuestList::instance.getMetrics(id);
+}
+
+/**
+ * Gets the list of connected gamepads.
+ * @return A vector of pointers to connected gamepads.
+ */
+vector<AGamepad*>& Hosting::getGamepads() {
+	return GamepadClient::instance.gamepads;
+}
+
+/**
+ * Gets the gamepad client instance.
+ * @return The gamepad client instance.
+ */
+GamepadClient& Hosting::getGamepadClient() {
+	return GamepadClient::instance;
+}
+
+/**
+ * Gets the hotseat instance.
+ * @return The hotseat instance.
+ */
+const char** Hosting::getGuestNames() {
+	return GuestList::instance.guestNames;
+}
+
+/**
+ * Toggles the gamepad lock state.
+ */
+void Hosting::toggleGamepadLock() {
+	GamepadClient::instance.toggleLock();
+}
+
+/**
+ * Toggles the gamepad lock buttons state.
+ */
+void Hosting::toggleGamepadLockButtons() {
+	GamepadClient::instance.toggleLockButtons();
+}
+
+/**
+ * Sets the game ID for the hosting session.
+ * @param gameID The game ID to set.
+ */
+void Hosting::setGameID(string gameID) {
+	try
+	{
+		strcpy_s(_hostConfig.gameID, gameID.c_str());
+	}
+	catch (const std::exception&) {}
+}
+
+/**
+ * Sets the maximum number of guests for the hosting session.
+ * @param maxGuests The maximum number of guests to set.
+ */
+void Hosting::setMaxGuests(uint8_t maxGuests) {
+	_hostConfig.maxGuests = maxGuests;
+}
+
+/**
+ * Sets the host configuration for the hosting session.
+ * @param roomName The name of the hosting room.
+ * @param gameId The game ID for the hosting session.
+ * @param maxGuests The maximum number of guests allowed.
+ * @param isPublicRoom Whether the room is public.
+ */
+void Hosting::setHostConfig(string roomName, string gameId, uint8_t maxGuests, bool isPublicRoom) {
+	setRoomName(roomName);
+	setGameID(gameId);
+	setMaxGuests(maxGuests);
+	setPublicRoom(isPublicRoom);
+}
+
+/**
+ * Sets the host configuration for the hosting session, including a secret.
+ * @param roomName The name of the hosting room.
+ * @param gameId The game ID for the hosting session.
+ * @param maxGuests The maximum number of guests allowed.
+ * @param isPublicRoom Whether the room is public.
+ * @param secret The secret code for the hosting session.
+ */
+void Hosting::setHostConfig(string roomName, string gameId, uint8_t maxGuests, bool isPublicRoom, string secret) {
+	setRoomName(roomName);
+	setGameID(gameId);
+	setMaxGuests(maxGuests);
+	setPublicRoom(isPublicRoom);
+	setRoomSecret(secret);
+}
+
+/**
+ * Sets the host video configuration for the hosting session.
+ * @param fps The frames per second to set.
+ * @param bandwidth The maximum bandwidth to set.
+ */
+void Hosting::setHostVideoConfig(uint32_t fps, uint32_t bandwidth) {
+	/*if (Config::cfg.video.resolutionIndex > 0) {
+		_hostConfig.video->resolutionX = Config::cfg.resolutions[Config::cfg.video.resolutionIndex].width;
+		_hostConfig.video->resolutionY = Config::cfg.resolutions[Config::cfg.video.resolutionIndex].height;
+	}*/
+	_hostConfig.video->encoderFPS = fps;
+	_hostConfig.video->encoderMaxBitrate = bandwidth;
+	Config::cfg.video.fps = fps;
+	Config::cfg.video.bandwidth = bandwidth;
+}
+
+/**
+ * Sets whether the hosting room is public.
+ * @param isPublicRoom True if the room should be public, false otherwise.
+ */
+void Hosting::setPublicRoom(bool isPublicRoom) {
+	_hostConfig.publicGame = isPublicRoom;
+}
+
+/**
+ * Sets the name of the hosting room.
+ * @param roomName The name of the room to set.
+ */
+void Hosting::setRoomName(string roomName) {
+	try
+	{
+		strcpy_s(_hostConfig.name, roomName.c_str());
+	}
+	catch (const std::exception&) {}
+}
+
+/**
+ * Sets the secret code for the hosting room.
+ * @param secret The secret code to set.
+ */
+void Hosting::setRoomSecret(string secret) {
+
+	try {
+		strcpy_s(_hostConfig.secret, secret.c_str());
+	}
+	catch (const std::exception&) {}
+
+}
+
+/**
+ * Starts hosting the Parsec session.
+ */
+void Hosting::startHosting() {
+
+	// Update config
+	Config::cfg.Save();
+
+	if (!_isRunning) {
+		_isRunning = true;
+		initAllModules();
+
+		try
+		{
+			if (_parsec != nullptr)
+			{
+				_mediaThread = thread ( [this]() {liveStreamMedia(); } );
+				_inputThread = thread ([this]() {pollInputs(); });
+				_eventThread = thread ([this]() {pollEvents(); });
+				_latencyThread = thread([this]() {pollLatency(); });
+				_smashSodaThread = thread([this]() { pollSmashSoda(); });
+				_mainLoopControlThread = thread ([this]() {mainLoopControl(); });
+
+				// Start the chat automoderator
+				AutoMod::instance.Start();
+
+				// Hotseat mode
+				if (Config::cfg.hotseat.enabled) {
+					Hotseat::instance.start();
+				}
+
+				// Overlay
+				if (Config::cfg.overlay.enabled) {
+					OverlayService::instance().start();
+				}
+
+			}
+		}
+		catch (const exception&)
+		{}
+	}
+
+	bool debug = false;
+}
+
+/**
+ * Stops hosting the Parsec session.
+ */
+void Hosting::stopHosting() {
+
+	// Stop the chat automoderator
+	AutoMod::instance.Stop();
+
+	// Remove post on Soda Arcade
+	if (!Config::cfg.room.privateRoom) {
+		Arcade::instance.deletePost();
+	}
+
+	_isRunning = false;
+	GuestList::instance.clear();
+
+	// Stop hotseat mode
+	if (Config::cfg.hotseat.enabled) {
+		Hotseat::instance.stop();
+	}
+
+	// Stop kiosk mode
+	if (Config::cfg.kioskMode.enabled) {
+		ProcessMan::instance.stop();
+	}
+
+	// Stop web socket server
+	if (WebSocket::instance.isRunning()) {
+		WebSocket::instance.stopServer();
+	}
+
+	// Stop overlay
+	OverlayService::instance().stop();
+
+}
+
+/**
+ * Strips the owner of a gamepad at the specified index.
+ * @param index The index of the gamepad to strip the owner from.
+ */
+void Hosting::stripGamepad(int index) {
+	GamepadClient::instance.clearOwner(index);
+}
+
+/**
+ * Sets the owner of a gamepad.
+ * @param gamepad The gamepad to set the owner for.
+ * @param newOwner The new owner of the gamepad.
+ * @param padId The ID of the gamepad.
+ */
+void Hosting::setOwner(AGamepad& gamepad, Guest newOwner, int padId) {
+	bool found = GamepadClient::instance.findPreferences(newOwner.userID, [&](GamepadClient::GuestPreferences& prefs) {
+		gamepad.setOwner(newOwner, padId, prefs.mirror);
+	});
+
+	if (!found) {
+		gamepad.setOwner(newOwner, padId, false);
+	}
+}
+
+/**
+ * Handles an incoming chat message from a guest.
+ * @param message The message sent.
+ * @param guest The guest who sent the message.
+ * @param isHost True if the sender is the host, false otherwise.
+ * @param isHidden True if the message should be hidden, false otherwise.
+ * @param outside True if the message is from outside the room, false otherwise.
+ */
+void Hosting::handleMessage(const char* message, Guest& guest, bool isHost, bool isHidden, bool outside) {
+	
+	if (!isRunning() && !Config::cfg.general.devMode) {
+		return;
+	}
+
+	if (!handleMuting(message, guest)) {
+		return;
+	}
+
+	ACommand* command = _chatBot->identifyUserDataMessage(message, guest, isHost);
+	command->run();
+
+	// Non-blocked default message
+	if (!isFilteredCommand(command)) {
+		Tier tier = _tierList.getTier(guest.userID);
+
+		CommandDefaultMessage defaultMessage(message, guest, _chatBot->getLastUserId(), tier, isHost);
+		defaultMessage.run();
+		_chatBot->setLastUserId(guest.userID);
+
+		if (!defaultMessage.getReply().empty() && !isHidden) {
+			broadcastChatMessage(defaultMessage.getReply());
+			if (Config::cfg.chat.ttsEnabled && !isHost && !outside) {
+				speakChatMessageAsync(guest.name, message);
+			}
+
+			string adjustedMessage = defaultMessage.getReply();
+			Stringer::replacePatternOnce(adjustedMessage, "%", "%%");
+			_chatLog.logMessage(adjustedMessage);
+			if (WebSocket::instance.isRunning()) {
+				json j;
+				j["event"] = "chat:new";
+				j["data"]["user"] = {
+					{"id", guest.userID},
+					{"name", guest.name},
+				};
+				j["data"]["message"] = message;
+				WebSocket::instance.sendMessageToAll(j.dump());
+			}
+
+			// Record last message
+			AutoMod::instance.RecordMessage(guest.userID, guest.name, message);
+		}
+	}
+
+	// Chatbot's command reply
+	if (!command->getReply().empty() && command->isBotCommand) {
+		if (isRunning()) {
+			broadcastChatMessage(command->getReply());
+		}
+		_chatLog.logCommand(command->getReply());
+		_chatBot->setLastUserId();
+		if (WebSocket::instance.isRunning()) {
+			json j;
+			j["event"] = "chat:log";
+			j["data"]["message"] = command->getReply();
+			WebSocket::instance.sendMessageToAll(j.dump());
+		}
+	}
+
+	delete command;
+
+}
+
+/**
+ * Handles muting a guest's messages.
+ * @param message The message sent.
+ * @param guest The guest to potentially mute.
+ * @return True if the operation was successful, false otherwise.
+ */
+bool Hosting::handleMuting(const char* message, Guest& guest) {
+	(void)message;
+	return !AutoMod::instance.isMuted(guest.userID);
+
+}
+
+/**
+ * Sends a host message to all connected guests.
+ * @param message The message to send.
+ * @param isHidden True if the message should be hidden, false otherwise.
+ */
+void Hosting::sendHostMessage(const char* message, bool isHidden) {
+	static bool isAdmin = true;
+	handleMessage(message, _host, true, isHidden);
+}
+
+// ============================================================
+// 
+//  PRIVATE
+// 
+// ============================================================
+
+/**
+ * Initializes all hosting modules.
+ */
+void Hosting::initAllModules() {
+	// Instance all gamepads at once
+	_connectGamepadsThread = thread([&]() {
+		GamepadClient::instance.sortGamepads();
+		_connectGamepadsThread.detach();
+	});
+
+	roomStart();
+}
+
+/**
+ * Streams media (audio and video) to connected guests.
+ */
+void Hosting::liveStreamMedia() {
+	_mediaMutex.lock();
+	_isMediaThreadRunning = true;
+
+	static uint32_t sleepTimeMs = 4;
+	_mediaClock.setDuration(sleepTimeMs);
+	_mediaClock.start();
+
+	while (_isRunning)
+	{
+		_mediaClock.reset();
+
+		_dx11.captureScreen(_parsec);
+
+		/**
+		 * This lambda is a workaround to a ParsecSDK bug.
+		 * When using a virtual device (e.g.: VBAudio Cable),
+		 * ParsecSDK crashes if an already started audio stream
+		 * stops sending audio.
+		 */
+		static const uint32_t SAFE_FREQUENCY = 48000;
+		static const auto submitSilence = [&]() {
+			// Use audioOut frequency if valid, otherwise use safe default
+			uint32_t freq = audioOut.getFrequency();
+			if (freq < 8000 || freq > 192000) freq = SAFE_FREQUENCY;
+			ParsecHostSubmitAudio(_parsec, PCM_FORMAT_INT16, freq, nullptr, 0);
+		};
+
+		// TODO fix for vb-cable
+		// You can't capture VB-cable unless sound is playing
+		// Resuming play after stopping also makes sound skip until you mute/unmute.
+		static unsigned int bufferErrorSpeakers = 0;
+		static unsigned int bufferErrorMic = 0;
+		static unsigned int maxBufferErrors = 100;
+		
+		// Helper to get a safe frequency value
+		auto getSafeFrequency = [&](uint32_t freq) -> uint32_t {
+			return (freq >= 8000 && freq <= 192000) ? freq : SAFE_FREQUENCY;
+		};
+
+		if (audioIn.isEnabled && audioOut.isEnabled)
+		{
+			audioIn.captureAudio();
+			audioOut.captureAudio();
+
+			if (!audioIn.isReady() && bufferErrorMic < maxBufferErrors) bufferErrorMic++;
+			if (!audioOut.isReady() && bufferErrorSpeakers < maxBufferErrors) bufferErrorSpeakers++;
+
+			if (audioIn.isReady() && audioOut.isReady())
+			{
+				// Resample both to 48kHz before mixing to avoid pitch issues
+				vector<int16_t> inBuffer = AudioMix::resample(audioIn.popBuffer(), audioIn.getFrequency(), SAFE_FREQUENCY);
+				vector<int16_t> outBuffer = AudioMix::resample(audioOut.popBuffer(), audioOut.getFrequency(), SAFE_FREQUENCY);
+				vector<int16_t> mixBuffer = _audioMix.mix(inBuffer, outBuffer);
+				ParsecHostSubmitAudio(_parsec, PCM_FORMAT_INT16, SAFE_FREQUENCY, mixBuffer.data(), (uint32_t)mixBuffer.size() / 2);
+				bufferErrorSpeakers = 0;
+				bufferErrorMic = 0;
+			}
+			// temporary added to transmit sound when vb-cable capture stops
+			else if (audioOut.isReady() && bufferErrorMic >= maxBufferErrors)
+			{
+				vector<int16_t> buffer = AudioMix::resample(audioOut.popBuffer(), audioOut.getFrequency(), SAFE_FREQUENCY);
+				ParsecHostSubmitAudio(_parsec, PCM_FORMAT_INT16, SAFE_FREQUENCY, buffer.data(), (uint32_t)buffer.size() / 2);
+			}
+			else if (audioIn.isReady() && bufferErrorSpeakers >= maxBufferErrors)
+			{
+				vector<int16_t> buffer = AudioMix::resample(audioIn.popBuffer(), audioIn.getFrequency(), SAFE_FREQUENCY);
+				ParsecHostSubmitAudio(_parsec, PCM_FORMAT_INT16, SAFE_FREQUENCY, buffer.data(), (uint32_t)buffer.size() / 2);
+			}
+			else { submitSilence(); }
+
+		}
+		else if (audioOut.isEnabled)
+		{
+			audioOut.captureAudio();
+			if (audioOut.isReady())
+			{
+				vector<int16_t> buffer = AudioMix::resample(audioOut.popBuffer(), audioOut.getFrequency(), SAFE_FREQUENCY);
+				ParsecHostSubmitAudio(_parsec, PCM_FORMAT_INT16, SAFE_FREQUENCY, buffer.data(), (uint32_t)buffer.size() / 2);
+			}
+			else { submitSilence(); }
+		}
+		else if (audioIn.isEnabled)
+		{
+			audioIn.captureAudio();
+			if (audioIn.isReady())
+			{
+				vector<int16_t> buffer = AudioMix::resample(audioIn.popBuffer(), audioIn.getFrequency(), SAFE_FREQUENCY);
+				ParsecHostSubmitAudio(_parsec, PCM_FORMAT_INT16, SAFE_FREQUENCY, buffer.data(), (uint32_t)buffer.size() / 2);
+			}
+			else { submitSilence(); }
+		}
+		else { submitSilence(); }
+		
+
+		sleepTimeMs = _mediaClock.getRemainingTime();
+		if (sleepTimeMs > 0)
+		{
+			Sleep(sleepTimeMs);
+		}
+	}
+
+	_isMediaThreadRunning = false;
+	_mediaMutex.unlock();
+	_mediaThread.detach();
+}
+
+/**
+ * The main loop control thread that manages the hosting lifecycle.
+ */
+void Hosting::mainLoopControl() {
+
+	do
+	{
+		Sleep(50);
+	} while (!_isRunning);
+
+	_isRunning = true;
+
+	_mediaMutex.lock();
+	_inputMutex.lock();
+	_eventMutex.lock();
+
+	ParsecHostStop(_parsec);
+	_isRunning = false;
+
+	_mediaMutex.unlock();
+	_inputMutex.unlock();
+	_eventMutex.unlock();
+
+	_mainLoopControlThread.detach();
+}
+
+/**
+ * Polls input events from connected guests.
+ */
+void Hosting::pollEvents() {
+	_eventMutex.lock();
+	_isEventThreadRunning = true;
+
+	string chatBotReply;
+
+	ParsecGuest* guests = nullptr;
+	int guestCount = 0;
+
+	ParsecHostEvent event;
+
+	while (_isRunning)
+	{
+		if (ParsecHostPollEvents(_parsec, 30, &event)) {
+			
+			ParsecGuest parsecGuest = event.guestStateChange.guest;
+			ParsecGuestState state = parsecGuest.state;
+			Guest guest = Guest(parsecGuest.name, parsecGuest.userID, parsecGuest.id);
+			guestCount = ParsecHostGetGuests(_parsec, GUEST_CONNECTED, &guests);
+			GuestList::instance.setGuests(guests, guestCount);
+			//logMessage("event: " + to_string(event.type) + " guest: " + guest.name + " state: " + to_string(state) + " status: " + to_string(event.guestStateChange.status));
+
+			switch (event.type)
+			{
+			case HOST_EVENT_GUEST_STATE_CHANGE:
+				onGuestStateChange(state, guest, event.guestStateChange.status);
+				break;
+
+			case HOST_EVENT_USER_DATA:
+				char* msg = (char*)ParsecGetBuffer(_parsec, event.userData.key);
+
+				if (event.userData.id == PARSEC_APP_CHAT_MSG) {
+					handleMessage(msg, guest);
+				}
+
+				ParsecFree(_parsec, msg);
+				break;
+			}
+		}
+	}
+
+	ParsecFree(_parsec, guests);
+	_isEventThreadRunning = false;
+	_eventMutex.unlock();
+	_eventThread.detach();
+}
+
+/**
+ * Polls latency metrics for connected guests.
+ */
+void Hosting::pollLatency() {
+	_latencyMutex.lock();
+	_isLatencyThreadRunning = true;
+	int guestCount = 0;
+	ParsecGuest* guests = nullptr;
+	while (_isRunning)
+	{
+		Sleep(2000);
+		guestCount = ParsecHostGetGuests(_parsec, GUEST_CONNECTED, &guests);
+		if (guestCount > 0) {
+			GuestList::instance.updateMetrics(guests, guestCount);
+
+			// Latency limiter
+			if (Config::cfg.room.latencyLimit) {
+				for (size_t mi = 0; mi < guestCount; mi++) {
+					MyMetrics m = GuestList::instance.getMetrics(guests[mi].id);
+
+					if (m.averageNetworkLatencySize > 5 &&
+						m.averageNetworkLatency > Config::cfg.room.latencyLimitThreshold) {
+						ParsecHostKickGuest(_parsec, guests[mi].id);
+					}
+				}
+			}
+		}
+
+		if (WebSocket::instance.isRunning()) {
+			json j;
+			j["event"] = "guest:poll";
+
+			json users = json::array();
+			for (Guest guest : getGuests()) {
+				users.push_back({
+					{"id", to_string(guest.userID)},
+					{"tier", _tierList.getTier(guest.userID)},
+					{"name", guest.name},
+					{"latency", GuestList::instance.getMetrics(guest.id).metrics.networkLatency }
+				});
+			}
+			j["data"]["users"] = users;
+
+			WebSocket::instance.sendMessageToAll(j.dump());
+		}
+		
+	}
+	_isLatencyThreadRunning = false;
+	_latencyMutex.unlock();
+	_latencyThread.detach();
+}
+
+/**
+ * Polls Smash Soda specific functionality.
+ */
+void Hosting::pollSmashSoda() {
+	_smashSodaMutex.lock();
+	_isSmashSodaThreadRunning = true;
+	while (_isRunning) {
+
+		Sleep(100);
+
+		// Handles all the automatic button press stuff
+		_macro.run();
+
+		// Updated room settings?
+		if (Config::cfg.roomChanged) {
+			ParsecHostSetConfig(_parsec, &_hostConfig, _parsecSession.sessionId.c_str());
+			Config::cfg.roomChanged = false;
+		}
+
+		// Poll inputs
+		if (WebSocket::instance.isRunning()) {
+			json j;
+			j["event"] = "gamepad:poll";
+			json pads = json::array();
+			for (AGamepad* gamepad : getGamepads()) {
+				if (gamepad->isConnected()) {
+
+					json pad;
+
+					// Owner
+					if (gamepad->owner.guest.userID != 0) {
+						json owner;
+						owner["id"] = gamepad->owner.guest.userID;
+						owner["name"] = gamepad->owner.guest.name;
+
+						owner["hotseatTime"] = Hotseat::instance.getUserTimeRemaining(gamepad->owner.guest.userID);
+
+						pad["owner"] = owner;
+					}
+
+					// Button array
+					WORD wButtons = gamepad->getState().Gamepad.wButtons;
+					json buttons = json::array();
+					buttons.push_back((wButtons & XUSB_GAMEPAD_A) != 0);
+					buttons.push_back((wButtons & XUSB_GAMEPAD_B) != 0);
+					buttons.push_back((wButtons & XUSB_GAMEPAD_X) != 0);
+					buttons.push_back((wButtons & XUSB_GAMEPAD_Y) != 0);
+					buttons.push_back((wButtons & XUSB_GAMEPAD_LEFT_SHOULDER) != 0);
+					buttons.push_back((wButtons & XUSB_GAMEPAD_RIGHT_SHOULDER) != 0);
+					buttons.push_back(gamepad->getState().Gamepad.bLeftTrigger > 0);
+					buttons.push_back(gamepad->getState().Gamepad.bRightTrigger > 0);
+					buttons.push_back((wButtons & XUSB_GAMEPAD_BACK) != 0);
+					buttons.push_back((wButtons & XUSB_GAMEPAD_START) != 0);
+					buttons.push_back((wButtons & XUSB_GAMEPAD_LEFT_THUMB) != 0);
+					buttons.push_back((wButtons & XUSB_GAMEPAD_RIGHT_THUMB) != 0);
+					buttons.push_back((wButtons & XUSB_GAMEPAD_DPAD_UP) != 0);
+					buttons.push_back((wButtons & XUSB_GAMEPAD_DPAD_DOWN) != 0);
+					buttons.push_back((wButtons & XUSB_GAMEPAD_DPAD_LEFT) != 0);
+					buttons.push_back((wButtons & XUSB_GAMEPAD_DPAD_RIGHT) != 0);
+
+					// Stick values
+					ImVec2 leftStick;
+					ImVec2 rightStick;
+					float lDistance = 0, rDistance = 0;
+
+					leftStick = stickShortToFloat(gamepad->getState().Gamepad.sThumbLX, gamepad->getState().Gamepad.sThumbLY, lDistance);
+					rightStick = stickShortToFloat(gamepad->getState().Gamepad.sThumbRX, gamepad->getState().Gamepad.sThumbRY, rDistance);
+
+					json axes = json::array();
+					axes.push_back(leftStick.x);
+					axes.push_back(leftStick.y);
+					axes.push_back(rightStick.x);
+					axes.push_back(rightStick.y);
+
+					// Create the pad object
+					pad["index"] = gamepad->getIndex();
+					pad["buttons"] = buttons;
+					pad["axes"] = axes;
+
+					// Add the pad to the array
+					pads.push_back(pad);
+
+				}
+			}
+
+			j["data"]["gamepads"] = pads;
+
+			WebSocket::instance.sendMessageToAll(j.dump());
+		}
+
+	}
+	
+	_isSmashSodaThreadRunning = false;
+	_smashSodaMutex.unlock();
+	_smashSodaThread.detach();
+
+}
+
+/**
+ * Checks if a guest at the specified index is a spectator.
+ */
+bool Hosting::isSpectator(int index) {
+
+	return false;
+
+}
+
+/**
+ * Adds a new guest to the new guest list.
+ */
+void Hosting::addNewGuest(Guest guest) {
+
+	NewGuest newGuest;
+	newGuest.guest = guest;
+	newGuest.timer.setDuration(newGuestList.size() * 2000);
+	newGuest.timer.start();
+	newGuestList.push_back(newGuest);
+
+	try {
+		PlaySound(TEXT("./SFX/new_guest.wav"), NULL, SND_FILENAME | SND_NODEFAULT | SND_ASYNC);
+	}
+	catch (const std::exception&) {}
+
+}
+
+/**
+ * Checks if the media thread is running.
+ */
+bool Hosting::isLatencyRunning() {
+	return _isLatencyThreadRunning;
+}
+
+/**
+ * Checks if the event thread is running.
+ */
+bool Hosting::isGamepadRunning() {
+	return _isGamepadThreadRunning;
+}
+
+/**
+ * Polls input events from connected guests.
+ */
+void Hosting::pollInputs() {
+	
+	_inputMutex.lock();
+	_isInputThreadRunning = true;
+
+	ParsecGuest inputGuest;
+	ParsecMessage inputGuestMsg;
+
+	while (_isRunning)
+	{
+		if (ParsecHostPollInput(_parsec, 4, &inputGuest, &inputGuestMsg))
+		{
+			Guest guest;
+			if (GuestList::instance.find(inputGuest.userID, &guest)) {
+				if (inputGuestMsg.type == MESSAGE_KEYBOARD && !guest.allowKeyboardInput) {
+					continue;
+				}
+
+				if ((inputGuestMsg.type == MESSAGE_MOUSE_BUTTON ||
+					inputGuestMsg.type == MESSAGE_MOUSE_WHEEL ||
+					inputGuestMsg.type == MESSAGE_MOUSE_MOTION) &&
+					!guest.allowMouseInput) {
+					continue;
+				}
+			}
+
+			if (!GamepadClient::instance.lock)
+			{
+				const bool consumedByGamepad = GamepadClient::instance.sendMessage(inputGuest, inputGuestMsg);
+				if (!consumedByGamepad) {
+					InputControlService::instance().handleParsecMessage(inputGuestMsg);
+				}
+			}
+
+		}
+	}
+
+	_isInputThreadRunning = false;
+	_inputMutex.unlock();
+	_inputThread.detach();
+}
+
+/**
+ * Starts the hosting room.
+ * @return True if the room was started successfully, false otherwise.
+ */
+bool Hosting::roomStart() {
+	
+	if (isReady()) {
+		ParsecStatus status = ParsecHostStart(_parsec, HOST_DESKTOP, &_hostConfig, _parsecSession.sessionId.c_str());
+		Sleep(2000);
+		ParsecHostStop(_parsec);
+		Sleep(1000);
+		status = ParsecHostStart(_parsec, HOST_GAME, &_hostConfig, _parsecSession.sessionId.c_str());
+
+		// Init overlay
+		if (Config::cfg.overlay.enabled) {
+			
+		}
+
+		// Send room to Soda Arcade
+		if (!Config::cfg.room.privateRoom) {
+			Arcade::instance.createPost();
+		}
+		
+		return status == PARSEC_OK;
+
+	}
+	return false;
+}
+
+/**
+ * Checks if a command is filtered.
+ * @param command The command to check.
+ * @return True if the command is filtered, false otherwise.
+ */
+bool Hosting::isFilteredCommand(ACommand* command) {
+	// TODO: Implement a filter for commands
+	return false;
+}
+
+/**
+ * Converts an IP address from string format to a uint32_t.
+ * @param ip The IP address in string format.
+ * @return The IP address as a uint32_t.
+ */
+uint32_t Hosting::ipToUint(const std::string& ip) {
+	uint32_t result = 0;
+	std::istringstream iss(ip);
+	std::string token;
+	while (std::getline(iss, token, '.')) {
+		result = (result << 8) + std::stoi(token);
+	}
+	return result;
+}
+
+/**
+ * Checks if an IP address is within a specified CIDR range.
+ * @param ip The IP address to check.
+ * @param cidr The CIDR range to check against.
+ * @return True if the IP address is within the CIDR range, false otherwise.
+ */
+bool Hosting::isIPInRange(const std::string& ip, const std::string& cidr) {
+	size_t pos = cidr.find('/');
+	std::string base_ip = cidr.substr(0, pos);
+	int prefix_len = std::stoi(cidr.substr(pos + 1));
+
+	uint32_t ip_addr = ipToUint(ip);
+	uint32_t net_addr = ipToUint(base_ip);
+
+	uint32_t mask = (prefix_len == 0) ? 0 : ~((1 << (32 - prefix_len)) - 1);
+
+	return (ip_addr & mask) == (net_addr & mask);
+}
+
+/**
+ * Checks if an IP address is a VPN.
+ * @param ip The IP address to check.
+ * @return True if the IP address is a VPN, false otherwise.
+ */
+bool Hosting::isVPN(const std::string& ip) {
+	for (const auto& range : Cache::cache.cidrRanges) {
+		if (isIPInRange(ip, range)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * GUEST STATE FUNCTIONS
+ */
+
+/**
+ * Logs a guest kick event.
+ * @param guest The guest who was kicked.
+ * @param reason The reason for the kick.
+ */
+void Hosting::logGuestKick(Guest& guest, string reason) {
+	string message = Config::cfg.chatbotName + "Kicked " + guest.name + " (" + reason + ").";
+	broadcastChatMessageAndLogCommand(message);
+}
+
+/**
+ * Checks if a guest is banned.
+ * @param guest The guest to check.
+ * @return True if the guest is banned, false otherwise.
+ */
+bool Hosting::isBanned(Guest& guest) {
+	if (Cache::cache.banList.isBanned(guest.userID)) {
+		if (Cache::cache.isSodaCop(guest.userID)) {
+			Cache::cache.banList.unban(guest.userID);
+			return false;
+		}
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Checks if a guest is an impersonator.
+ * @param guest The guest to check.
+ * @return True if the guest is an impersonator, false otherwise.
+ */
+bool Hosting::isImpersonator(Guest& guest) {
+	if (guest.name == "MickeyUK" && guest.userID != _mickeyID) {
+		return true;
+	}
+	
+	GuestData guestData(guest.name, guest.userID);
+	if (!Cache::cache.verifiedList.Verify(guestData)) {
+		return true;
+	}
+
+	return false;
+}
+
+/**
+ * Checks if a guest is using a blocked VPN.
+ * @param guest The guest to check.
+ * @return True if the guest is using a blocked VPN, false otherwise.
+ */
+bool Hosting::isBlockedVPN(Guest& guest) {
+	if (Config::cfg.general.blockVPN && Cache::cache.pendingIpAddress.size() > 0) {
+		if (isVPN(Cache::cache.pendingIpAddress)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Processes a new guest connection.
+ * @param guest The guest who connected.
+ */
+void Hosting::processNewGuestConnection(Guest& guest) {
+	// 1. Security & Verification Checks
+	if (isBanned(guest)) {
+		logGuestKick(guest, "Banned");
+		ParsecHostKickGuest(_parsec, guest.id);
+		return;
+	}
+	if (isImpersonator(guest)) {
+		logGuestKick(guest, "Impersonator");
+		ParsecHostKickGuest(_parsec, guest.id);
+		return;
+	}
+	if (isBlockedVPN(guest)) {
+		logGuestKick(guest, "VPN");
+		ParsecHostKickGuest(_parsec, guest.id);
+		return;
+	}
+
+	// 2. Set Guest Properties
+	if (Cache::cache.modList.isModded(guest.userID)) {
+		_tierList.setTier(guest.userID, Tier::MOD);
+	}
+	if (_host.userID == guest.userID) {
+		_tierList.setTier(guest.userID, Tier::GOD);
+	}
+
+	GuestStateStore::GuestPermissionState persistedPermissions;
+	if (GuestStateStore::instance().tryGetGuestInputPermissions(guest.userID, persistedPermissions)) {
+		if (guest.allowKeyboardInput != persistedPermissions.keyboard || guest.allowMouseInput != persistedPermissions.mouse) {
+			setGuestInputPermissions(guest.userID, persistedPermissions.keyboard, persistedPermissions.mouse);
+		}
+	}
+
+	// 3. Log Connection & Announce
+	string logMessage = _chatBot->formatGuestConnection(guest, GUEST_CONNECTED, PARSEC_OK);
+	broadcastChatMessageAndLogCommand(logMessage);
+
+	// 4. Add to Game Systems
+	_guestHistory.add(GuestData(guest.name, guest.userID));
+	if (!Config::cfg.room.privateRoom) {
+		Arcade::instance.updateGuestCount(GuestList::instance.getGuests().size());
+	}
+
+	// 5. Send Welcome Message & Play Sound
+	addNewGuest(guest);
+	string welcomeMsg = Config::cfg.chat.welcomeMessage;
+	welcomeMsg = regex_replace(welcomeMsg, regex("_PLAYER_"), guest.name);
+	ParsecHostSendUserData(_parsec, guest.id, HOSTING_CHAT_MSG_ID, welcomeMsg.c_str());
+}
+
+/**
+ * Processes a guest disconnection.
+ * @param guest The guest who disconnected.
+ * @param status The status of the disconnection.
+ */
+void Hosting::processGuestDisconnection(Guest& guest, ParsecStatus& status) {
+	string logMessage;
+	if (isBanned(guest)) {
+		logMessage = _chatBot->formatBannedGuestMessage(guest);
+	}
+	else {
+		logMessage = _chatBot->formatGuestConnection(guest, GUEST_DISCONNECTED, status);
+	}
+	broadcastChatMessageAndLogCommand(logMessage);
+
+	if (Config::cfg.hotseat.enabled) {
+		Hotseat::instance.pauseUser(guest.userID);
+	}
+
+	GuestList::instance.deleteMetrics(guest.id);
+	int droppedPadCount = GamepadClient::instance.onQuit(guest);
+	if (droppedPadCount > 0) {
+		broadcastChatMessageAndLogCommand("Dropped " + to_string(droppedPadCount) + " gamepads for " + guest.name);
+	}
+
+	if (status != CONNECT_WRN_NO_ROOM) {
+		try {
+			PlaySound(TEXT("./SFX/guest_leave.wav"), NULL, SND_FILENAME | SND_NODEFAULT | SND_ASYNC);
+		}
+		catch (const std::exception&) {}
+
+		if (!Config::cfg.room.privateRoom) {
+			Arcade::instance.updateGuestCount(GuestList::instance.getGuests().size());
+		}
+	}
+}
+
+/**
+ * Handles guest state changes.
+ * @param state The new state of the guest.
+ * @param guest The guest whose state changed.
+ * @param status The status of the state change.
+ */
+void Hosting::onGuestStateChange(ParsecGuestState& state, Guest& guest, ParsecStatus& status) {
+	switch (state) {
+		case GUEST_CONNECTING:
+			handleGuestIpAddress(guest);
+			break;
+
+		case GUEST_CONNECTED:
+			processNewGuestConnection(guest);
+			break;
+
+		case GUEST_DISCONNECTED:
+			processGuestDisconnection(guest, status);
+			break;
+
+		case GUEST_FAILED:
+			broadcastChatMessageAndLogCommand(_chatBot->formatGuestConnection(guest, state, status));
+			break;
+	}
+}
+
+/**
+ * Handles the IP address of a guest.
+ * @param guest The guest whose IP address is being handled.
+ * @return True if the operation was successful, false otherwise.
+ */
+bool Hosting::handleGuestIpAddress(Guest& guest) {
+
+	if (Cache::cache.pendingIpAddress.size() < 1) {
+		return true;
+	}
+
+	if (Config::cfg.general.ipBan && Cache::cache.isBannedIPAddress(Cache::cache.pendingIpAddress)) {
+		logGuestKick(guest, "Banned IP Address");
+		ParsecHostKickGuest(_parsec, guest.id);
+		return false;
+	}
+
+	Cache::cache.userIpMap[guest.userID] = Cache::cache.pendingIpAddress;
+	Cache::cache.pendingIpAddress = "";
+	return true;
+}
+
+/**
+ * Removes a game from the games list.
+ * @param name The name of the game to remove.
+ * @return True if the operation was successful, false otherwise.
+ */
+bool Hosting::removeGame(string name) {
+
+	_gamesList.remove(name, [&](GameData& guest) {
+		
+	});
+
+	return true;
+
+}
+
+/**
+ * Logs a message from the chatbot.
+ * @param message The message to log.
+ */
+void Hosting::logMessage(string message) {
+	string chatbotName = Config::cfg.chatbotName;
+	_chatLog.logCommand(chatbotName + " " + message);
+	if (WebSocket::instance.isRunning()) {
+		json j;
+		j["event"] = "chat:log";
+		j["data"]["user"]["name"] = chatbotName;
+		j["data"]["message"] = message;
+		WebSocket::instance.sendMessageToAll(j.dump());
+	}
+}
+
+/**
+ * Handles a message from an external source.
+ * @param source The source of the message.
+ * @param user The user who sent the message.
+ * @param message The message content.
+ */
+void Hosting::messageFromExternalSource(string source, string user, string message) {
+	_chatLog.logCommand("[" + source + "] " + user + ": " + message);
+	broadcastChatMessage("[" + source + "] " + user + ": " + message);
+}
+
+/**
+ * Checks if hotseat mode is enabled.
+ * @return True if hotseat mode is enabled, false otherwise.
+ */
+bool Hosting::isHotseatEnabled() {
+	return false;
+}
+
+/**
+ * Adds fake guests for testing purposes.
+ * @param count The number of fake guests to add.
+ */
+void Hosting::addFakeGuests(int count) {
+	srand(time(NULL));
+	for (int i = 0; i < count; ++i) {
+		int id = rand() % 1000 + 1;
+		Guest guest = Guest(
+			randomString(5), id, id
+		);
+		guest.fake = true;
+
+		GuestList::instance.getGuests().push_back(guest);
+	}
+
+}
+
+/**
+ * Removes a fake guest by user ID.
+ * @param userID The user ID of the fake guest to remove.
+ */
+void Hosting::removeFakeGuest(int userID) {
+	for (int i = 0; i < GuestList::instance.getGuests().size(); ++i) {
+		if (GuestList::instance.getGuests()[i].userID == userID) {
+			GuestList::instance.getGuests().erase(GuestList::instance.getGuests().begin() + i);
+			break;
+		}
+	}
+}
+
+/**
+ * Generates a random string of the specified length.
+ * @param len The length of the random string.
+ * @return The generated random string.
+ */
+string Hosting::randomString(const int len) {
+
+	static const char alphanum[] =
+		"0123456789"
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		"abcdefghijklmnopqrstuvwxyz";
+	std::string tmp_s;
+	tmp_s.reserve(len);
+
+	for (int i = 0; i < len; ++i) {
+		tmp_s += alphanum[rand() % (sizeof(alphanum) - 1)];
+	}
+
+	return tmp_s;
+}
+
+/**
+ * Converts joystick short values to float values.
+ * @param lx The left joystick X value.
+ * @param ly The left joystick Y value.
+ * @param distance The distance from the center.
+ * @return The converted joystick values as ImVec2.
+ */
+ImVec2 Hosting::stickShortToFloat(SHORT lx, SHORT ly, float& distance) {
+    static float shortMax = 32768;
+    ImVec2 stick = ImVec2(
+        (float)lx / shortMax,
+        (float)ly / shortMax
+    );
+    stick.x = min(max(stick.x, -1.0f), 1.0f);
+    stick.y = min(max(stick.y, -1.0f), 1.0f);
+
+    distance = sqrtf(stick.x * stick.x + stick.y * stick.y);
+    if (distance > 0.01f)
+    {
+        if (abs(lx) > abs(ly))
+        {
+            if (abs(stick.x) > 0.01f)
+            {
+                float yy = stick.y / abs(stick.x);
+                float xx = 1.0f;
+                float maxDiagonal = sqrtf(xx * xx + yy * yy);
+                if (maxDiagonal > 0.01f)
+                {
+                    stick.x /= maxDiagonal;
+                    stick.y /= maxDiagonal;
+                }
+            }
+        }
+        else
+        {
+            if (abs(stick.y) > 0.01f)
+            {
+                float xx = stick.x / abs(stick.y);
+                float yy = 1.0f;
+                float maxDiagonal = sqrtf(xx * xx + yy * yy);
+                if (maxDiagonal > 0.01f)
+                {
+                    stick.x /= maxDiagonal;
+                    stick.y /= maxDiagonal;
+                }
+            }
+        }
+    }
+
+    return stick;
+}
+
+/**
+ * Gets the hotseat manager.
+ */
+Hotseat& Hosting::getHotseat() {
+	return _hotseat;
+}

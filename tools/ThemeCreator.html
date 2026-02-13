@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smash Soda Theme Creator</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    @font-face {
+      font-family: 'AfacadFlux';
+      src: url('../SmashSoda/fonts/AfacadFlux-Bold.ttf') format('truetype');
+      font-weight: bold;
+      font-style: normal;
+    }
+
+    @font-face {
+      font-family: 'AfacadFlux';
+      src: url('../SmashSoda/fonts/AfacadFlux-Regular.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+    }
+
+    #app {
+      background: #333;
+        color: #fff;
+        display: flex;
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+        gap: 1rem;
+        align-items: stretch;
+        padding: 1rem;
+        box-sizing: border-box;
+        font-family: 'AfacadFlux';
+    }
+
+    .preview {
+      border: solid 1px #FFF;
+    }
+
+    .app-sidebar {
+      background: #222;
+        display: flex;
+        flex-direction: column;
+        border: solid 1px #FFF;
+        overflow: hidden;
+        max-height: calc(100vh - 2rem);
+        width: 300px;
+        box-sizing: border-box;
+        border-radius: 8px;
+    }
+
+    .app-sidebar form {
+      display: flex;
+      padding: 1rem;
+      flex-direction: column;
+      gap: 1rem;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .app-options {
+      display: flex;
+      gap: 1rem;
+      padding: 1rem;
+      background: rgba(0, 0, 0, .5);
+    }
+
+    .form-group {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .form-group label {
+      flex: 1;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .form-group input[type="color"] {
+      border: solid 1px transparent;
+      outline: none;
+      width: 32px;
+      height: 32px;
+      cursor: pointer;
+    }
+
+    .preview {
+      padding: 1rem;
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      flex: 1;
+      border-radius: 8px;
+    }
+
+    .preview-sidebar {
+      display: flex;
+      flex-direction: column;
+      border: solid 1px;
+      border-radius: 8px;
+    }
+
+    .sidebar-icon {
+      width: 38px;
+      height: 38px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .sidebar-icon svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .flex {
+      flex: 1;
+    }
+
+    .widgets {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      flex-wrap: wrap;
+
+      .widget {
+        border-radius: 8px;
+        width: 350px;
+        min-height: 200px;
+        max-height: 450px;
+        display: flex;
+        flex-direction: column;
+
+        .widget-titlebar {
+          border-radius: 8px 8px 0 0;
+          padding: 0.25rem 0.5rem;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+
+          .widget-title {
+            flex: 1;
+            font-weight: bold;
+            text-align: center;
+          }
+
+          .widget-titlebar-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+          }
+        }
+
+        .widget-footer {
+            border-radius: 0 0 8px 8px;
+            padding: 0.4rem 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+      }
+    }
+
+    button {
+      border-radius: 8px;
+      outline: none;
+      border: solid 1px transparent;
+      padding: 0.25rem 0.5rem;
+      font-weight: 600;
+      font-family: 'AfacadFlux';
+      font-size: 16px;
+    }
+
+    .widget-body {
+      padding: 1rem;
+    }
+
+    .widget-form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    label {
+      font-size: 16px;
+    }
+
+    input,
+    .dropdown {
+      border: solid 1px transparent;
+      border-radius: 8px;
+      outline: none;
+      padding: 0.35rem 0.5rem;
+      font-family: 'AfacadFlux';
+      font-size: 16px;
+    }
+
+    .form-help-text {
+      font-size: 14px;
+    }
+
+    .widget-tabs {
+      display: flex;
+      padding: 0.5rem 0.5rem;
+      padding-bottom: 0;
+      border-radius: 8px 8px 0 0;
+      gap: .5rem;
+    }
+
+    .tab {
+      border-radius: 8px 8px 0 0;
+      padding: 0.2rem 0.5rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .widget-body {
+      border-radius: 0 0 8px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      overflow: auto;
+      padding: 1rem;
+    }
+
+    .checkbox-container {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .checkbox {
+      width: 20px;
+      height: 20px;
+      border: solid 1px;
+      border-radius: 4px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .dropdown {
+      position: relative;
+    }
+
+    .dropdown-btn {
+      position: absolute;
+      top: 0;
+      right: 0;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      border-radius: 0 8px 8px 0;
+    }
+  </style>
+
+  <style id="theme"></style>
+</head>
+<body>
+  <div id="app">
+    <div class="app-sidebar">
+        <form id="themeForm"></form>
+        <div class="app-options">
+            <button id="save">Save</button>
+        </div>
+    </div>
+    <div class="preview background">
+      <div class="preview-sidebar navbar-background navbar-border">
+        <div class="navbar-icon-active sidebar-icon"><i class="fas fa-play"></i></div>
+        <div class="navbar-icon-active sidebar-icon"><i class="fas fa-users"></i></div>
+        <div class="navbar-icon sidebar-icon"><i class="fas fa-volume-high"></i></div>
+        <div class="navbar-icon sidebar-icon"><i class="fas fa-tv"></i></div>
+      </div>
+
+      <div class="widgets">
+        <div class="panel-background panel-border-active widget chat-widget">
+          <div class="widget-titlebar panel-title-bar-active panel-title-bar-active-text panel-title-bar-active-text">
+              <i class="widget-titlebar-icon fas fa-caret-down"></i>
+              <div class="widget-title">Chat</div>
+              <i class="widget-titlebar-icon fas fa-times"></i>
+          </div>
+          <div class="widget-body panel-text flex">
+              <div class="widget-form-group">
+                <label for="channelName" class="form-label">Label</label>
+                <input type="text" id="channelName" name="channelName" class="form-input-background">
+                <div class="form-help-text">
+                  This is a help text
+                </div>
+              </div>
+              <div class="widget-form-group">
+                <div class="checkbox-container">
+                  <div class="checkbox">
+                    <i class="fas fa-check"></i>
+                  </div>
+                  <label for="channelName" class="form-label">Label</label>
+                </div>
+                <div class="form-help-text">
+                  This is a help text
+                </div>
+              </div>
+              <div class="widget-form-group">
+                <label for="channelName" class="form-label">Label</label>
+                <div class="dropdown">
+                  <span>Dropdown</span>
+                  <button class="button-primary dropdown-btn"><i class="fas fa-caret-down"></i></button>
+                </div>
+                <div class="form-help-text">
+                  This is a help text
+                </div>
+              </div>
+
+              <div class="widget-form-group">
+                <label for="channelName" class="form-label">Label</label>
+                <input type="text" id="channelName" name="channelName" class="form-input-background">
+                <div class="form-help-text">
+                  This is a help text
+                </div>
+              </div>
+              <div class="widget-form-group">
+                <div class="checkbox-container">
+                  <div class="checkbox">
+                    <i class="fas fa-check"></i>
+                  </div>
+                  <label for="channelName" class="form-label">Label</label>
+                </div>
+                <div class="form-help-text">
+                  This is a help text
+                </div>
+              </div>
+              <div class="widget-form-group">
+                <label for="channelName" class="form-label">Label</label>
+                <div class="dropdown">
+                  <span>Dropdown</span>
+                  <button class="button-primary dropdown-btn"><i class="fas fa-caret-down"></i></button>
+                </div>
+                <div class="form-help-text">
+                  This is a help text
+                </div>
+              </div>
+
+              <div class="widget-form-group">
+                <label for="channelName" class="form-label">Label</label>
+                <input type="text" id="channelName" name="channelName" class="form-input-background">
+                <div class="form-help-text">
+                  This is a help text
+                </div>
+              </div>
+              <div class="widget-form-group">
+                <div class="checkbox-container">
+                  <div class="checkbox">
+                    <i class="fas fa-check"></i>
+                  </div>
+                  <label for="channelName" class="form-label">Label</label>
+                </div>
+                <div class="form-help-text">
+                  This is a help text
+                </div>
+              </div>
+              <div class="widget-form-group">
+                <label for="channelName" class="form-label">Label</label>
+                <div class="dropdown">
+                  <span>Dropdown</span>
+                  <button class="button-primary dropdown-btn"><i class="fas fa-caret-down"></i></button>
+                </div>
+                <div class="form-help-text">
+                  This is a help text
+                </div>
+              </div>
+          </div>
+          <div class="widget-footer panel-footer panel-footer-text">
+              <button class="btn button-secondary">Cancel</button>
+              <button class="btn button-primary">Submit</button>
+          </div>
+        </div>
+
+        <div class="panel-background panel-border widget chat-widget">
+            <div class="widget-titlebar panel-title-bar panel-title-bar-text panel-title-bar-active-text">
+                <i class="widget-titlebar-icon fas fa-caret-down"></i>
+                <div class="widget-title">Hosting</div>
+                <i class="widget-titlebar-icon fas fa-times"></i>
+            </div>
+            <div class="widget-tabs tabs-background">
+              <div class="tab tab-active tab-active-text">
+                Tab 1
+              </div>
+              <div class="tab tab-text">
+                Tab 2
+              </div>
+              <div class="tab tab-text">
+                Tab 3
+              </div>
+            </div>
+            <div class="widget-body panel-text flex">
+                This is an example of a paragraph inside a widget, using text wrap.
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // === Default color set ===
+    const colors = {
+      panelBackground: "#302E2B",
+      panelBorder: "#FFFFFF33",
+      panelBorderActive: "#B04229",
+      panelText: "#F2EEDD",
+      panelTitleBar: "#F2EEDD",
+      panelTitleBarText: "#302E2B",
+      panelTitleBarActive: "#B04229",
+      panelTitleBarActiveText: "#FFFFFF",
+      panelFooter: "#282623",
+      panelFooterText: "#B3B3B3",
+
+      groupBackground: "#302E2B",
+
+      tabsBackground: "#282623",
+      tabsBorder: "#B04229",
+      tab: "#F2EEDD",
+      tabText: "#302E2B",
+      tabHovered: "#B5472E",
+      tabActive: "#B04229",
+      tabActiveText: "#FFFFFF",
+
+      navbarBackground: "#302E2B",
+      navbarBorder: "#FFFFFF33",
+      navbarIcon: "#FFFFFF26",
+      navbarIconActive: "#C76554",
+
+      formLabel: "#F2EEDD",
+      formInputBackground: "#1A1A1A",
+      formInputBorder: "#262626",
+      formInputBorderActive: "#FFFFFF",
+      formInputText: "#B3B3B3",
+      formInputTextActive: "#FFFFFF",
+      formHelpText: "#E8CC40",
+
+      buttonPrimary: "#B04229",
+      buttonPrimaryText: "#FFFFFF",
+      buttonPrimaryHovered: "#B5472E",
+      buttonPrimaryActive: "#B8482E",
+      buttonPrimaryDisabled: "#262626",
+
+      buttonSecondary: "#F2EEDD",
+      buttonSecondaryText: "#302E2BFF",
+      buttonSecondaryHovered: "#FAF3D9",
+      buttonSecondaryActive: "#d4d4d4ff",
+      buttonSecondaryDisabled: "#262626",
+
+      buttonEnable: "#B04229",
+      buttonDisable: "#262626",
+
+      scrollbarBackground: "#262626",
+      scrollbarHandle: "#B3B3B3",
+      scrollbarHandleHovered: "#B3B3B3",
+      scrollbarHandleActive: "#B3B3B3",
+
+      background: "#1E1C1AFF"
+    };
+
+    const themeForm = document.getElementById("themeForm");
+    const themeStyle = document.getElementById("theme");
+
+    // === Generate inputs dynamically ===
+    Object.keys(colors).forEach(key => {
+      const group = document.createElement("div");
+      group.className = "form-group";
+
+      const label = document.createElement("label");
+      label.textContent = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+
+      const input = document.createElement("input");
+      input.type = "color";
+      input.value = colors[key].slice(0, 7); // remove alpha if present
+      input.name = key;
+
+      input.addEventListener("input", e => {
+        colors[key] = e.target.value;
+        updateTheme();
+      });
+
+      group.appendChild(label);
+      group.appendChild(input);
+      themeForm.appendChild(group);
+    });
+
+    // === Build CSS from colors object ===
+    function updateTheme() {
+      const css = `
+        /* === Panel === */
+        .panel-background { background-color: ${colors.panelBackground}; }
+        .panel-border { border: solid 1px; border-color: ${colors.panelBorder}; }
+        .panel-border-active { border: solid 1px; border-color: ${colors.panelBorderActive}; }
+        .panel-text { color: ${colors.panelText}; }
+        .panel-title-bar { background-color: ${colors.panelTitleBar}; }
+        .panel-title-bar-text { color: ${colors.panelTitleBarText} !important; }
+        .panel-title-bar-active { background-color: ${colors.panelTitleBarActive}; }
+        .panel-title-bar-active-text { color: ${colors.panelTitleBarActiveText}; }
+        .panel-footer { border-top: solid 1px ${colors.panelBorder}; background-color: ${colors.panelFooter}; }
+        .panel-footer-text { color: ${colors.panelFooterText}; }
+
+        /* === Tabs === */
+        .tabs-background { background-color: ${colors.tabsBackground}; }
+        .tabs-border { border-color: ${colors.tabsBorder}; }
+        .tab { background-color: ${colors.tab}; }
+        .tab-text { color: ${colors.tabText}; }
+        .tab-hovered { background-color: ${colors.tabHovered}; }
+        .tab-active { background-color: ${colors.tabActive}; }
+        .tab-active-text { color: ${colors.tabActiveText}; }
+
+        .panel-border .tabs-background { border-bottom: solid 1px ${colors.panelBorder}; }
+        .panel-border-active .tabs-background { border-bottom: solid 1px ${colors.panelBorderActive}; }
+
+        /* === Navbar === */
+        .navbar-background { background-color: ${colors.navbarBackground}; }
+        .navbar-border { border: solid 1px ${colors.navbarBorder}; }
+        .navbar-icon { color: ${colors.navbarIcon}; }
+        .navbar-icon-active { color: ${colors.navbarIconActive}; }
+
+        /* === Form === */
+        .form-label { color: ${colors.formLabel}; }
+        .form-input-background { background-color: ${colors.formInputBackground}; }
+        .form-input-border { border-color: ${colors.formInputBorder}; }
+        .form-input-border-active { border-color: ${colors.formInputBorderActive}; }
+        .form-input-text { color: ${colors.formInputText}; }
+        .form-input-text-active { color: ${colors.formInputTextActive}; }
+        .form-help-text { color: ${colors.formHelpText}; }
+
+        /* === Buttons (Primary) === */
+        .button-primary { background-color: ${colors.buttonPrimary}; color: ${colors.buttonPrimaryText}; border-color: ${colors.buttonPrimary}; }
+        .button-primary-hovered { background-color: ${colors.buttonPrimaryHovered}; color: #FFFFFF; }
+        .button-primary-active { background-color: ${colors.buttonPrimaryActive}; color: #FFFFFF; }
+        .button-primary-disabled { background-color: ${colors.buttonPrimaryDisabled}; }
+
+        .button-primary:hover { background-color: ${colors.buttonPrimaryHovered}; border-color: ${colors.buttonPrimaryHovered}; }
+        .button-primary:active { background-color: ${colors.buttonPrimaryActive}; border-color: ${colors.buttonPrimaryActive}; }
+
+        /* === Buttons (Secondary) === */
+        .button-secondary { background-color: ${colors.buttonSecondary}; color: ${colors.buttonSecondaryText}; border-color: #00000033; }
+        .button-secondary-hovered { background-color: ${colors.buttonSecondaryHovered}; color: #302E2B; }
+        .button-secondary-active { background-color: ${colors.buttonSecondaryActive}; color: #FFFFFF; }
+        .button-secondary-disabled { background-color: ${colors.buttonSecondaryDisabled}; }
+
+        .button-secondary:hover { background-color: ${colors.buttonSecondaryHovered}; border-color: ${colors.buttonSecondaryHovered}; }
+        .button-secondary:active { background-color: ${colors.buttonSecondaryActive}; border-color: ${colors.buttonSecondaryActive}; }
+
+        /* === Button States === */
+        .button-enable { background-color: ${colors.buttonEnable}; }
+        .button-disable { background-color: ${colors.buttonDisable}; }
+
+        /* === Scrollbar === */
+        .scrollbar-background { background-color: ${colors.scrollbarBackground}; }
+        .scrollbar-handle { background-color: ${colors.scrollbarHandle}; }
+        .scrollbar-handle-hovered { background-color: ${colors.scrollbarHandleHovered}; }
+        .scrollbar-handle-active { background-color: ${colors.scrollbarHandleActive}; }
+
+        .widget-body::-webkit-scrollbar { width: 16px; height: 10px; }
+        .widget-body::-webkit-scrollbar-track { background-color: ${colors.scrollbarBackground}; }
+        .widget-body::-webkit-scrollbar-thumb { background-color: ${colors.scrollbarHandle}; border-radius: 16px; }
+        .widget-body::-webkit-scrollbar-thumb:hover { background-color: ${colors.scrollbarHandleHovered}; }
+        .widget-body::-webkit-scrollbar-thumb:active { background-color: ${colors.scrollbarHandleActive}; }
+
+        .background { background-color: ${colors.background}; }
+
+        label {
+          color: ${colors.formLabel};
+        }
+
+        input[type="text"],
+        .dropdown {
+          color: ${colors.formInputText};
+          border-color: ${colors.formInputBorder};
+          background-color: ${colors.formInputBackground};
+        }
+
+        input[type="text"]:focus {
+          color: ${colors.formInputTextActive};
+          border-color: ${colors.formInputBorderActive};
+        }
+
+        .checkbox {
+          color: ${colors.formInputText};
+          border-color: ${colors.formInputBorder};
+          background-color: ${colors.formInputBackground};
+        }
+      `;
+      themeStyle.textContent = css;
+    }
+
+    // Initialize theme on load
+    updateTheme();
+
+    document.getElementById("save").addEventListener("click", () => {
+        const themeName = prompt("Enter a name for your theme:");
+        if (!themeName) return; 
+        const themeData = { name: themeName, ...colors };
+
+        // Convert to JSON
+        const json = JSON.stringify(themeData, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+
+        // Create a temporary download link
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${themeName.replace(/\s+/g, "_")}.json`;
+        document.body.appendChild(a);
+        a.click();
+
+        // Cleanup
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
