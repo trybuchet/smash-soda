@@ -1,8 +1,69 @@
 ﻿#include "../services/WebSocket.h"
 #include "Config.h"
 #include "../Hosting.h"
+#include "../helpers/Countries.h"
 extern Hosting g_hosting;
 Config Config::cfg;
+
+namespace {
+	bool IsExtendedVKey(UINT vk) {
+		switch (vk) {
+		case VK_RCONTROL:
+		case VK_RMENU:
+		case VK_INSERT:
+		case VK_DELETE:
+		case VK_HOME:
+		case VK_END:
+		case VK_PRIOR:
+		case VK_NEXT:
+		case VK_LEFT:
+		case VK_RIGHT:
+		case VK_UP:
+		case VK_DOWN:
+		case VK_NUMLOCK:
+		case VK_DIVIDE:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	std::string ResolveHotkeyName(int keyCode) {
+		if (keyCode <= 0) {
+			return "[Unknown Key]";
+		}
+
+		const UINT vk = static_cast<UINT>(keyCode);
+		const UINT scanCode = MapVirtualKeyA(vk, MAPVK_VK_TO_VSC);
+		LONG lParam = static_cast<LONG>(scanCode << 16);
+		if (IsExtendedVKey(vk)) {
+			lParam |= 1 << 24;
+		}
+
+		char keyName[128] = { 0 };
+		if (GetKeyNameTextA(lParam, keyName, static_cast<int>(sizeof(keyName))) > 0) {
+			return std::string(keyName);
+		}
+
+		Keymap keymap = Keymap();
+		const std::string fallback = keymap.findKeyByValue(keyCode);
+		if (fallback != "[Unknown Key]") {
+			return fallback;
+		}
+
+		return "VK " + std::to_string(keyCode);
+	}
+
+	std::string TrimCommand(const std::string& command) {
+		const size_t first = command.find_first_not_of(" \t\r\n");
+		if (first == std::string::npos) {
+			return "";
+		}
+
+		const size_t last = command.find_last_not_of(" \t\r\n");
+		return command.substr(first, last - first + 1);
+	}
+}
 
 /// <summary>
 /// Loads the config file.
@@ -169,15 +230,37 @@ void Config::Load() {
 			cfg.socket.port = setValue(cfg.socket.port, j["Socket"]["port"].get<unsigned int>());
 
 			// Hotkeys
-			Keymap keymap = Keymap();
+			cfg.hotkeys.keys.clear();
 			cfg.hotkeys.enabled = setValue(cfg.hotkeys.enabled, j["Hotkeys"]["enabled"].get<bool>());
-			json hotkeys = j["Hotkeys"]["keys"];
-			for (json::iterator it = hotkeys.begin(); it != hotkeys.end(); ++it) {
-				Hotkey hotkey;
-				hotkey.command = it.value()["command"].get<string>();
-				hotkey.key = it.value()["key"].get<int>();
-				hotkey.keyName = keymap.findKeyByValue(hotkey.key);
-				cfg.hotkeys.keys.push_back(hotkey);
+			if (j.contains("Hotkeys") && j["Hotkeys"].contains("keys") && j["Hotkeys"]["keys"].is_array()) {
+				json hotkeys = j["Hotkeys"]["keys"];
+				for (json::iterator it = hotkeys.begin(); it != hotkeys.end(); ++it) {
+					Hotkey hotkey;
+					hotkey.command = it.value().value("command", "");
+					hotkey.key = it.value().value("key", 0);
+					if (hotkey.command.empty() || hotkey.key == 0) {
+						continue;
+					}
+
+					hotkey.keyName = it.value().value("keyName", "");
+					if (hotkey.keyName.empty() || hotkey.keyName == "[Unknown Key]") {
+						hotkey.keyName = ResolveHotkeyName(hotkey.key);
+					}
+
+					bool updatedExisting = false;
+					for (Hotkey& existing : cfg.hotkeys.keys) {
+						if (existing.key == hotkey.key) {
+							existing.command = hotkey.command;
+							existing.keyName = hotkey.keyName;
+							updatedExisting = true;
+							break;
+						}
+					}
+
+					if (!updatedExisting) {
+						cfg.hotkeys.keys.push_back(hotkey);
+					}
+				}
 			}
 
 			// Developer
@@ -196,6 +279,48 @@ void Config::Load() {
 
 	}
 
+	// Keep arcade country code and index synchronized for callers that use either field.
+	{
+		Countries countries;
+		int resolvedIndex = -1;
+
+		for (size_t i = 0; i < countries.list.size(); ++i) {
+			if (countries.list[i].first == cfg.arcade.country) {
+				resolvedIndex = static_cast<int>(i);
+				break;
+			}
+		}
+
+		// Backward compatibility for configs that may store display names.
+		if (resolvedIndex == -1) {
+			for (size_t i = 0; i < countries.list.size(); ++i) {
+				if (countries.list[i].second == cfg.arcade.country) {
+					resolvedIndex = static_cast<int>(i);
+					cfg.arcade.country = countries.list[i].first;
+					break;
+				}
+			}
+		}
+
+		if (resolvedIndex == -1) {
+			if (cfg.arcade.countryIndex >= 0 && cfg.arcade.countryIndex < static_cast<int>(countries.list.size())) {
+				resolvedIndex = cfg.arcade.countryIndex;
+				cfg.arcade.country = countries.list[resolvedIndex].first;
+			}
+			else {
+				resolvedIndex = 0;
+				for (size_t i = 0; i < countries.list.size(); ++i) {
+					if (countries.list[i].first == "US") {
+						resolvedIndex = static_cast<int>(i);
+						break;
+					}
+				}
+				cfg.arcade.country = countries.list[resolvedIndex].first;
+			}
+		}
+
+		cfg.arcade.countryIndex = resolvedIndex;
+	}
 }
 
 /// <summary>
@@ -452,9 +577,20 @@ void Config::LoadOverlayThemes() {
 /// Map a hotkey to a command.
 /// </summary>
 void Config::SetHotkey() {
+	if (Config::cfg.mapHotkey) {
+		return;
+	}
+
+	Config::cfg.pendingHotkeyCommand = TrimCommand(Config::cfg.pendingHotkeyCommand);
+	if (Config::cfg.pendingHotkeyCommand.empty()) {
+		Config::cfg.mapHotkey = false;
+		return;
+	}
+
 	Config::cfg.mapHotkey = true;
 	auto keyThread = [&]() {
 		while (Config::cfg.mapHotkey) {
+			bool keyHandled = false;
 			for (int keyCode = 0; keyCode < 256; ++keyCode) {
 				if (GetAsyncKeyState(keyCode) & 0x8000) {
 
@@ -462,23 +598,36 @@ void Config::SetHotkey() {
 					if (keyCode == VK_ESCAPE) {
 						Config::cfg.pendingHotkeyCommand = "";
 						Config::cfg.mapHotkey = false;
+						keyHandled = true;
 						break;
 					}
 
 					// Modifier keys not allowed
-					if (keyCode == VK_SHIFT || keyCode == VK_CONTROL || keyCode == VK_MENU) {
-						break;
+					if (keyCode == VK_SHIFT || keyCode == VK_LSHIFT || keyCode == VK_RSHIFT ||
+						keyCode == VK_CONTROL || keyCode == VK_LCONTROL || keyCode == VK_RCONTROL ||
+						keyCode == VK_MENU || keyCode == VK_LMENU || keyCode == VK_RMENU ||
+						keyCode == VK_LWIN || keyCode == VK_RWIN) {
+						continue;
 					}
 
 					// Mouse buttons not allowed
-					if (keyCode == VK_LBUTTON || keyCode == VK_RBUTTON || keyCode == VK_MBUTTON) {
-						break;
+					if (keyCode == VK_LBUTTON || keyCode == VK_RBUTTON || keyCode == VK_MBUTTON ||
+						keyCode == VK_XBUTTON1 || keyCode == VK_XBUTTON2) {
+						continue;
 					}
 
 					Config::cfg.AddHotkey(Config::cfg.pendingHotkeyCommand, keyCode);
 					Config::cfg.mapHotkey = false;
+					keyHandled = true;
+					while (GetAsyncKeyState(keyCode) & 0x8000) {
+						Sleep(10);
+					}
+					break;
 
 				}
+			}
+			if (keyHandled) {
+				break;
 			}
 			Sleep(100);
 		}
@@ -488,25 +637,54 @@ void Config::SetHotkey() {
 }
 
 void Config::AddHotkey(string command, int key) {
+	const std::string normalizedCommand = TrimCommand(command);
+	if (normalizedCommand.empty() || key <= 0) {
+		return;
+	}
+
+	for (Hotkey& existing : cfg.hotkeys.keys) {
+		if (existing.key == key) {
+			existing.command = normalizedCommand;
+			existing.keyName = ResolveHotkeyName(key);
+			Config::cfg.Save();
+			return;
+		}
+	}
+
 	Hotkey hotkey;
-	hotkey.command = command;
+	hotkey.command = normalizedCommand;
 	hotkey.key = key;
-	
-	Keymap keymap = Keymap();
-	hotkey.keyName = keymap.findKeyByValue(key);
+	hotkey.keyName = ResolveHotkeyName(key);
+
+	if (g_hosting.mainWindow != nullptr) {
+		const int hotkeyId = static_cast<int>(cfg.hotkeys.keys.size());
+		if (!RegisterHotKey(g_hosting.mainWindow, hotkeyId, MOD_CONTROL | MOD_NOREPEAT, key)) {
+			return;
+		}
+	}
 
 	cfg.hotkeys.keys.push_back(hotkey);
-	RegisterHotKey(g_hosting.mainWindow, cfg.hotkeys.keys.size()-1, MOD_CONTROL|MOD_NOREPEAT, key);
 	Config::cfg.Save();
 }
 
 void Config::RemoveHotkey(int index) {
-	for (int i = 0; i < Config::cfg.hotkeys.keys.size(); i++) {
-		if (i == index) {
+	if (index < 0 || index >= static_cast<int>(Config::cfg.hotkeys.keys.size())) {
+		return;
+	}
+
+	if (g_hosting.mainWindow != nullptr) {
+		for (int i = 0; i < static_cast<int>(Config::cfg.hotkeys.keys.size()); i++) {
 			UnregisterHotKey(g_hosting.mainWindow, i);
-			Config::cfg.hotkeys.keys.erase(Config::cfg.hotkeys.keys.begin() + i);
-			Config::cfg.Save();
-			break;
 		}
 	}
+
+	Config::cfg.hotkeys.keys.erase(Config::cfg.hotkeys.keys.begin() + index);
+
+	if (g_hosting.mainWindow != nullptr) {
+		for (int i = 0; i < static_cast<int>(Config::cfg.hotkeys.keys.size()); i++) {
+			RegisterHotKey(g_hosting.mainWindow, i, MOD_CONTROL | MOD_NOREPEAT, Config::cfg.hotkeys.keys[i].key);
+		}
+	}
+
+	Config::cfg.Save();
 }

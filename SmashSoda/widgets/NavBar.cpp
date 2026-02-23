@@ -30,12 +30,13 @@ void NavBar::render(
 	
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4, 4));
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0,0));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
 	//ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
 	//ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 0);
 
 	Theme* theme = ThemeController::getInstance().getActiveTheme();
-	ImGui::PushStyleColor(ImGuiCol_WindowBg, theme->panelBackground);
-	ImGui::PushStyleColor(ImGuiCol_Border, theme->panelBorderActive);
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, theme->navbarBackground);
+	ImGui::PushStyleColor(ImGuiCol_Border, theme->navbarBorder);
 
 	ImGui::Begin(
 		"##NavBar", (bool*)0,
@@ -156,15 +157,14 @@ void NavBar::render(
 	else {
 
 		if (IconButton::render(AppIcons::info, AppColors::panelText, iconSize)) {
-			//const wchar_t* link = L"https://github.com/soda-arcade/smash-soda/wiki";
-			// PathHelper::getCurrentPath() to open "docs/index.html" (not the github wiki)
+			const wchar_t* link = L"https://github.com/soda-arcade/smash-soda/wiki";
 
-			const char* curPath = PathHelper::GetCurrentPath().c_str();
-			char docsPath[256];
-			sprintf(docsPath, "%s\\docs\\index.html", curPath);
+			// const char* curPath = PathHelper::GetCurrentPath().c_str();
+			// char docsPath[256];
+			// sprintf(docsPath, "%s\\docs\\index.html", curPath);
 
-			wchar_t link[256];
-			mbstowcs(link, docsPath, 256);
+			// wchar_t link[256];
+			// mbstowcs(link, docsPath, 256);
 
 			ShellExecute(0, 0, link, 0, 0, SW_SHOW);
 		}
@@ -184,6 +184,8 @@ void NavBar::render(
 
 	ImGui::End();
 
+	ImGui::PopStyleColor(2);
+	ImGui::PopStyleVar();
 	ImGui::PopStyleVar();
 	ImGui::PopStyleVar();
 	//ImGui::PopStyleVar();

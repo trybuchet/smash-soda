@@ -2,6 +2,7 @@
 #include "services/OverlayService.h"
 #include "services/InputControlService.h"
 #include "services/GuestStateStore.h"
+#include <deque>
 
 using namespace std;
 
@@ -884,91 +885,151 @@ void Hosting::liveStreamMedia() {
 	_mediaClock.setDuration(sleepTimeMs);
 	_mediaClock.start();
 
+	const uint32_t SAFE_FREQUENCY = 48000;
+	const size_t SUBMIT_CHUNK_FRAMES = static_cast<size_t>(SAFE_FREQUENCY / 100); // 10ms
+	const size_t SUBMIT_CHUNK_SAMPLES = SUBMIT_CHUNK_FRAMES * 2; // stereo interleaved
+	const size_t MAX_PENDING_SAMPLES = SUBMIT_CHUNK_SAMPLES * 24; // ~240ms queue headroom
+
+	std::deque<int16_t> pendingIn;
+	std::deque<int16_t> pendingOut;
+	std::vector<int16_t> silenceChunk(SUBMIT_CHUNK_SAMPLES, 0);
+	auto lastAudioTick = std::chrono::steady_clock::now();
+	double audioFrameBudget = 0.0;
+
+	auto submitSilence = [&]() {
+		// Keep a stable sample rate to avoid device-rate oscillation (e.g. 44.1k Bluetooth).
+		ParsecHostSubmitAudio(_parsec, PCM_FORMAT_INT16, SAFE_FREQUENCY, nullptr, 0);
+	};
+
+	auto appendPending = [&](std::deque<int16_t>& pending, const std::vector<int16_t>& buffer) {
+		if (buffer.empty()) {
+			return;
+		}
+
+		pending.insert(pending.end(), buffer.begin(), buffer.end());
+		if (pending.size() > MAX_PENDING_SAMPLES) {
+			const size_t overflow = pending.size() - MAX_PENDING_SAMPLES;
+			for (size_t i = 0; i < overflow; ++i) {
+				pending.pop_front();
+			}
+		}
+	};
+
+	auto popPendingChunk = [&](std::deque<int16_t>& pending, bool* hadData = nullptr) {
+		const bool hasSamples = !pending.empty();
+		if (hadData != nullptr) {
+			*hadData = hasSamples;
+		}
+
+		std::vector<int16_t> out(SUBMIT_CHUNK_SAMPLES, 0);
+		size_t take = (std::min)(pending.size(), SUBMIT_CHUNK_SAMPLES);
+		if ((take % 2) != 0) {
+			take--;
+		}
+
+		for (size_t i = 0; i < take; ++i) {
+			out[i] = pending.front();
+			pending.pop_front();
+		}
+
+		return out;
+	};
+
+	auto drainSource = [&](AudioSource& source, std::deque<int16_t>& pending) {
+		while (source.isReady()) {
+			std::vector<int16_t> buffer = source.popBuffer();
+			if (buffer.empty()) {
+				continue;
+			}
+
+			appendPending(pending, AudioMix::resample(buffer, source.getFrequency(), SAFE_FREQUENCY));
+		}
+	};
+
 	while (_isRunning)
 	{
 		_mediaClock.reset();
 
 		_dx11.captureScreen(_parsec);
 
-		/**
-		 * This lambda is a workaround to a ParsecSDK bug.
-		 * When using a virtual device (e.g.: VBAudio Cable),
-		 * ParsecSDK crashes if an already started audio stream
-		 * stops sending audio.
-		 */
-		static const uint32_t SAFE_FREQUENCY = 48000;
-		static const auto submitSilence = [&]() {
-			// Use audioOut frequency if valid, otherwise use safe default
-			uint32_t freq = audioOut.getFrequency();
-			if (freq < 8000 || freq > 192000) freq = SAFE_FREQUENCY;
-			ParsecHostSubmitAudio(_parsec, PCM_FORMAT_INT16, freq, nullptr, 0);
+		if (audioIn.isEnabled) {
+			audioIn.captureAudio();
+			drainSource(audioIn, pendingIn);
+		}
+		else {
+			pendingIn.clear();
+		}
+
+		if (audioOut.isEnabled) {
+			audioOut.captureAudio();
+			drainSource(audioOut, pendingOut);
+		}
+		else {
+			pendingOut.clear();
+		}
+
+		auto submitBuffer = [&](const std::vector<int16_t>& buffer) {
+			if (buffer.empty()) {
+				return;
+			}
+
+			ParsecHostSubmitAudio(_parsec, PCM_FORMAT_INT16, SAFE_FREQUENCY, buffer.data(), static_cast<uint32_t>(buffer.size() / 2));
 		};
 
-		// TODO fix for vb-cable
-		// You can't capture VB-cable unless sound is playing
-		// Resuming play after stopping also makes sound skip until you mute/unmute.
-		static unsigned int bufferErrorSpeakers = 0;
-		static unsigned int bufferErrorMic = 0;
-		static unsigned int maxBufferErrors = 100;
-		
-		// Helper to get a safe frequency value
-		auto getSafeFrequency = [&](uint32_t freq) -> uint32_t {
-			return (freq >= 8000 && freq <= 192000) ? freq : SAFE_FREQUENCY;
-		};
+		auto now = std::chrono::steady_clock::now();
+		double elapsedSeconds = std::chrono::duration<double>(now - lastAudioTick).count();
+		lastAudioTick = now;
+		audioFrameBudget += elapsedSeconds * static_cast<double>(SAFE_FREQUENCY);
 
-		if (audioIn.isEnabled && audioOut.isEnabled)
-		{
-			audioIn.captureAudio();
-			audioOut.captureAudio();
-
-			if (!audioIn.isReady() && bufferErrorMic < maxBufferErrors) bufferErrorMic++;
-			if (!audioOut.isReady() && bufferErrorSpeakers < maxBufferErrors) bufferErrorSpeakers++;
-
-			if (audioIn.isReady() && audioOut.isReady())
-			{
-				// Resample both to 48kHz before mixing to avoid pitch issues
-				vector<int16_t> inBuffer = AudioMix::resample(audioIn.popBuffer(), audioIn.getFrequency(), SAFE_FREQUENCY);
-				vector<int16_t> outBuffer = AudioMix::resample(audioOut.popBuffer(), audioOut.getFrequency(), SAFE_FREQUENCY);
-				vector<int16_t> mixBuffer = _audioMix.mix(inBuffer, outBuffer);
-				ParsecHostSubmitAudio(_parsec, PCM_FORMAT_INT16, SAFE_FREQUENCY, mixBuffer.data(), (uint32_t)mixBuffer.size() / 2);
-				bufferErrorSpeakers = 0;
-				bufferErrorMic = 0;
-			}
-			// temporary added to transmit sound when vb-cable capture stops
-			else if (audioOut.isReady() && bufferErrorMic >= maxBufferErrors)
-			{
-				vector<int16_t> buffer = AudioMix::resample(audioOut.popBuffer(), audioOut.getFrequency(), SAFE_FREQUENCY);
-				ParsecHostSubmitAudio(_parsec, PCM_FORMAT_INT16, SAFE_FREQUENCY, buffer.data(), (uint32_t)buffer.size() / 2);
-			}
-			else if (audioIn.isReady() && bufferErrorSpeakers >= maxBufferErrors)
-			{
-				vector<int16_t> buffer = AudioMix::resample(audioIn.popBuffer(), audioIn.getFrequency(), SAFE_FREQUENCY);
-				ParsecHostSubmitAudio(_parsec, PCM_FORMAT_INT16, SAFE_FREQUENCY, buffer.data(), (uint32_t)buffer.size() / 2);
-			}
-			else { submitSilence(); }
-
+		// Bound catch-up to avoid runaway submission bursts after long stalls.
+		const double maxFrameBudget = static_cast<double>(SUBMIT_CHUNK_FRAMES * 6);
+		if (audioFrameBudget > maxFrameBudget) {
+			audioFrameBudget = maxFrameBudget;
 		}
-		else if (audioOut.isEnabled)
+
+		size_t submittedChunks = 0;
+		while (audioFrameBudget >= static_cast<double>(SUBMIT_CHUNK_FRAMES) && submittedChunks < 6)
 		{
-			audioOut.captureAudio();
-			if (audioOut.isReady())
+			if (audioIn.isEnabled && audioOut.isEnabled)
 			{
-				vector<int16_t> buffer = AudioMix::resample(audioOut.popBuffer(), audioOut.getFrequency(), SAFE_FREQUENCY);
-				ParsecHostSubmitAudio(_parsec, PCM_FORMAT_INT16, SAFE_FREQUENCY, buffer.data(), (uint32_t)buffer.size() / 2);
+				bool hasIn = false;
+				bool hasOut = false;
+				std::vector<int16_t> inChunk = popPendingChunk(pendingIn, &hasIn);
+				std::vector<int16_t> outChunk = popPendingChunk(pendingOut, &hasOut);
+
+				if (hasIn && hasOut) {
+					const std::vector<int16_t>& mixBuffer = _audioMix.mix(inChunk, outChunk);
+					submitBuffer(mixBuffer);
+				}
+				else if (hasOut) {
+					submitBuffer(outChunk);
+				}
+				else if (hasIn) {
+					submitBuffer(inChunk);
+				}
+				else {
+					submitBuffer(silenceChunk);
+				}
 			}
-			else { submitSilence(); }
-		}
-		else if (audioIn.isEnabled)
-		{
-			audioIn.captureAudio();
-			if (audioIn.isReady())
+			else if (audioOut.isEnabled)
 			{
-				vector<int16_t> buffer = AudioMix::resample(audioIn.popBuffer(), audioIn.getFrequency(), SAFE_FREQUENCY);
-				ParsecHostSubmitAudio(_parsec, PCM_FORMAT_INT16, SAFE_FREQUENCY, buffer.data(), (uint32_t)buffer.size() / 2);
+				submitBuffer(popPendingChunk(pendingOut));
 			}
-			else { submitSilence(); }
+			else if (audioIn.isEnabled)
+			{
+				submitBuffer(popPendingChunk(pendingIn));
+			}
+			else {
+				submitBuffer(silenceChunk);
+			}
+
+			audioFrameBudget -= static_cast<double>(SUBMIT_CHUNK_FRAMES);
+			submittedChunks++;
 		}
-		else { submitSilence(); }
+
+		if (submittedChunks == 0) {
+			submitSilence();
+		}
 		
 
 		sleepTimeMs = _mediaClock.getRemainingTime();

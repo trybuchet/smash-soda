@@ -106,6 +106,17 @@ bool ChatWidget::render(bool& showWindow) {
 
     endWidget();
 
+    if (isClearChat) {
+        _chatLog.clear();
+
+        ChatBot* chatBot = _hosting.getChatBot();
+        if (chatBot != nullptr) {
+            chatBot->setLastUserId();
+        }
+
+        isClearChat = false;
+    }
+
     return true;
 }
 

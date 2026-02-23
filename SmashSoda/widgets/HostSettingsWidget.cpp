@@ -51,6 +51,8 @@ HostSettingsWidget::HostSettingsWidget(Hosting& hosting, function<void(bool)> on
     _kioskMode = Config::cfg.kioskMode.enabled;
 
     _libraryGame = "Default";
+    Arcade::instance.artworkID = Config::cfg.room.artworkID;
+    _selectedArtworkValue = std::to_string(Arcade::instance.artworkID);
 
     if (strlen(_secret) == 0) {
         try { strcpy_s(_secret, "play-now"); }
@@ -145,18 +147,19 @@ bool HostSettingsWidget::render(bool& showWindow, HWND& hwnd) {
 
     }
 
-    if (elText("Room Name", _roomName, "The name of your room. Must be between 3 and 255 characters.")) {
-        if (strlen(_roomName) > 50) {
-            string name = _roomName;
-            name = name.substr(0, 50);
-            strcpy_s(_roomName, name.c_str());
-        }
-        if (_hosting.isRunning()) {
-            _updated = true;
-        }
-    }
+    // Room name + Game name is a feature of new Soda Arcade
+    // if (elText("Room Name", _roomName, "The name of your room. Must be between 3 and 255 characters.")) {
+    //     if (strlen(_roomName) > 50) {
+    //         string name = _roomName;
+    //         name = name.substr(0, 50);
+    //         strcpy_s(_roomName, name.c_str());
+    //     }
+    //     if (_hosting.isRunning()) {
+    //         _updated = true;
+    //     }
+    // }
 
-    if (elText("Game Name", _gameName, "Here you can tell people what game you're hosting. Max 255 characters.")) {
+    if (elText("Room Name", _gameName, "Here you can tell people what game you're hosting. Max 255 characters.")) {
         if (strlen(_gameName) > 50) {
             string name = _gameName;
             name = name.substr(0, 50);
@@ -166,6 +169,9 @@ bool HostSettingsWidget::render(bool& showWindow, HWND& hwnd) {
             _updated = true;
         }
     }
+
+    // Keep share link in sync with runtime auth/session state.
+    updateSecretLink();
 
     // Read only share link
     elReadOnly("Share Link", _shareLink, "The link to share with your guests.");
@@ -193,6 +199,70 @@ bool HostSettingsWidget::render(bool& showWindow, HWND& hwnd) {
         }
 
         updateSecretLink();
+    }
+
+    const bool isArcadeAuthenticated = !Arcade::instance.credentials.token.empty();
+    if (isArcadeAuthenticated && !Config::cfg.room.privateRoom && !Arcade::instance.artwork.empty()) {
+        std::vector<std::pair<std::string, std::string>> artworkOptions;
+        artworkOptions.reserve(Arcade::instance.artwork.size() + 1);
+        artworkOptions.push_back({ "-1", "None" });
+
+        int selectedIndex = -1;
+        for (size_t i = 0; i < Arcade::instance.artwork.size(); ++i) {
+            const auto& art = Arcade::instance.artwork[i];
+            artworkOptions.push_back({ std::to_string(art.id), art.title });
+
+            if (art.id == Arcade::instance.artworkID) {
+                selectedIndex = static_cast<int>(i);
+            }
+        }
+
+        _selectedArtwork = selectedIndex;
+        _selectedArtworkValue = std::to_string(Arcade::instance.artworkID);
+        bool selectedValueValid = false;
+        for (const auto& option : artworkOptions) {
+            if (option.first == _selectedArtworkValue) {
+                selectedValueValid = true;
+                break;
+            }
+        }
+        if (!selectedValueValid) {
+            _selectedArtwork = -1;
+            _selectedArtworkValue = "-1";
+            Arcade::instance.artworkID = -1;
+            Config::cfg.room.artworkID = -1;
+        }
+
+        if (elSelect(
+            "Custom Artwork",
+            artworkOptions,
+            _selectedArtworkValue,
+            "If you have any custom artwork uploaded to Soda Arcade, you can select it here."
+        )) {
+            int selectedArtworkId = -1;
+            try {
+                selectedArtworkId = std::stoi(_selectedArtworkValue);
+            }
+            catch (const std::exception&) {
+                selectedArtworkId = -1;
+                _selectedArtworkValue = "-1";
+            }
+
+            Arcade::instance.artworkID = selectedArtworkId;
+            Config::cfg.room.artworkID = selectedArtworkId;
+
+            _selectedArtwork = -1;
+            for (size_t i = 0; i < Arcade::instance.artwork.size(); ++i) {
+                if (Arcade::instance.artwork[i].id == selectedArtworkId) {
+                    _selectedArtwork = static_cast<int>(i);
+                    break;
+                }
+            }
+
+            if (_hosting.isRunning()) {
+                _updated = true;
+            }
+        }
     }
 
     // Hotseat
@@ -389,7 +459,7 @@ void HostSettingsWidget::savePreferences() {
     //Config::cfg.room.theme = theme;
 
     // Artwork
-    //Config::cfg.room.artworkID = Config::cfg.artwork[_selectedArtwork].id;
+    Config::cfg.room.artworkID = Arcade::instance.artworkID;
 
     Config::cfg.Save();
 }
@@ -401,18 +471,29 @@ void HostSettingsWidget::updateSecretLink() {
 
     try
     {
+        const string parsecLink = string("https://parsec.gg/g/") + _hosting.getSession().hostPeerId + "/" + _secret + "/";
         if (Config::cfg.room.privateRoom) {
             strcpy_s(
                 _shareLink,
                 128,
-                (string("https://parsec.gg/g/") + _hosting.getSession().hostPeerId + "/" + _secret + "/").c_str()
+                parsecLink.c_str()
             );
         } else {
-            strcpy_s(
-                _shareLink,
-                128,
-                (string("https://soda-arcade.com/invite/") + Arcade::instance.credentials.username + "/room/").c_str()
-            );
+            if (!Arcade::instance.credentials.username.empty()) {
+                strcpy_s(
+                    _shareLink,
+                    128,
+                    (string("https://soda-arcade.com/invite/") + Arcade::instance.credentials.username + "/room/").c_str()
+                );
+            } else {
+                // Username can be populated slightly later than token/session updates.
+                // Keep a valid link instead of rendering a malformed invite URL.
+                strcpy_s(
+                    _shareLink,
+                    128,
+                    parsecLink.c_str()
+                );
+            }
         }
     }
     catch (const std::exception&) {}

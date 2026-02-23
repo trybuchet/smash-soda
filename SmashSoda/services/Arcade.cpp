@@ -277,7 +277,26 @@ bool Arcade::createPost() {
 	j["link"] = link;
 	j["peer_id"] = peer_id;
 	j["secret"] = secret;
-	j["country"] = countries.list[Config::cfg.arcade.countryIndex].first;
+
+	string countryCode = "";
+	for (const auto& country : countries.list) {
+		if (country.first == Config::cfg.arcade.country || country.second == Config::cfg.arcade.country) {
+			countryCode = country.first;
+			break;
+		}
+	}
+
+	if (countryCode.empty()) {
+		const int countryIndex = Config::cfg.arcade.countryIndex;
+		if (countryIndex >= 0 && countryIndex < static_cast<int>(countries.list.size())) {
+			countryCode = countries.list[countryIndex].first;
+		}
+		else {
+			countryCode = "US";
+		}
+	}
+
+	j["country"] = countryCode;
 
 	j["game"] = Config::cfg.room.game;
 	j["guest_limit"] = Config::cfg.room.guestLimit;

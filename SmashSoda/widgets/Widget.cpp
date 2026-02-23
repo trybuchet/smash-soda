@@ -1,6 +1,24 @@
 #include "Widget.h"
 #include <algorithm>
 
+namespace {
+    float WidgetScale()
+    {
+        const float scale = ThemeController::getInstance().getUiScale();
+        return scale > 0.0f ? scale : 1.0f;
+    }
+
+    float S(float value)
+    {
+        return value * WidgetScale();
+    }
+
+    ImVec2 SV(float x, float y)
+    {
+        return ImVec2(S(x), S(y));
+    }
+}
+
 int Widget::AutoWrapCallback(ImGuiInputTextCallbackData* data) {
 
     AutoWrapContext* ctx = static_cast<AutoWrapContext*>(data->UserData);
@@ -91,12 +109,15 @@ void Widget::startWidget(const char* name, bool& visible, int x, int y, int w, i
     ImGui::PushFont(AppFonts::title);
 
     // Set window position and size constraints
-    ImGui::SetNextWindowPos(ImVec2(x, y), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSizeConstraints(ImVec2(minW, minH), ImVec2(w, h));
+    ImGui::SetNextWindowPos(ImVec2(S(static_cast<float>(x)), S(static_cast<float>(y))), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSizeConstraints(
+        ImVec2(S(static_cast<float>(minW)), S(static_cast<float>(minH))),
+        ImVec2(S(static_cast<float>(w)), S(static_cast<float>(h)))
+    );
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, SV(0.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, S(8.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, S(8.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0,0,0,0.2f));
 
     ImGui::Begin(name, &visible, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
@@ -113,7 +134,7 @@ void Widget::startWidget(const char* name, bool& visible, int x, int y, int w, i
 }
 
 void Widget::endTabs() {
-    ImGui::Unindent(20);
+    ImGui::Unindent(S(20.0f));
     ImGui::EndTabBar();
 }
 
@@ -125,25 +146,25 @@ void Widget::startTabs(const std::vector<Tab>& tabs, bool footer) {
 
     Theme* theme = ThemeController::getInstance().getActiveTheme();
 
-    ImGui::SetCursorPos(ImVec2(0, 0));
+    ImGui::SetCursorPos(SV(0.0f, 0.0f));
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     pos = ImGui::GetCursorScreenPos();
     drawList->AddRectFilled(
         pos,
-        ImVec2(pos.x + size.x, pos.y + 64),
+        ImVec2(pos.x + size.x, pos.y + S(64.0f)),
         ImGui::ColorConvertFloat4ToU32(theme->tabsBackground),
-        10,
+        S(10.0f),
         ImDrawFlags_RoundCornersBottom
     );
 
-    ImGui::SetCursorPos(ImVec2(0, 0));
-    ImGui::Dummy(ImVec2(0, 30));
+    ImGui::SetCursorPos(SV(0.0f, 0.0f));
+    ImGui::Dummy(SV(0.0f, 30.0f));
 
     std::string pillsName = "##pills-" + std::string(widgetName);
     ImGui::BeginTabBar(pillsName.c_str());
 
-    ImGui::Dummy(ImVec2(20, 10));
-    ImGui::Indent(20);
+    ImGui::Dummy(SV(20.0f, 10.0f));
+    ImGui::Indent(S(20.0f));
 
     for (int i = 0; i < tabs.size(); i++) {
 
@@ -175,18 +196,18 @@ void Widget::startTabs(const std::vector<Tab>& tabs, bool footer) {
  */
 void Widget::startHeader(string id, int height) {
 
-	headerHeight = height;
+	headerHeight = static_cast<int>(S(static_cast<float>(height)));
     size = ImGui::GetContentRegionAvail();
     pos = ImGui::GetCursorScreenPos();
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 10);
-    ImGui::BeginChild(id.c_str(), ImVec2(size.x, 50), false, ImGuiWindowFlags_NoScrollbar);
-    ImGui::SetCursorPos(ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, S(10.0f));
+    ImGui::BeginChild(id.c_str(), ImVec2(size.x, S(50.0f)), false, ImGuiWindowFlags_NoScrollbar);
+    ImGui::SetCursorPos(SV(0.0f, 0.0f));
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     pos = ImGui::GetCursorScreenPos();
-    drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + headerHeight), ImGui::ColorConvertFloat4ToU32(ImVec4(0, 0, 0, 0.1)), 8, ImDrawFlags_RoundCornersBottom);
-    ImGui::SetCursorPos(ImVec2(0, 0));
-    ImGui::Dummy(ImVec2(0, 2));
-    ImGui::Indent(10);
+    drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + static_cast<float>(headerHeight)), ImGui::ColorConvertFloat4ToU32(ImVec4(0, 0, 0, 0.1)), S(8.0f), ImDrawFlags_RoundCornersBottom);
+    ImGui::SetCursorPos(SV(0.0f, 0.0f));
+    ImGui::Dummy(SV(0.0f, 2.0f));
+    ImGui::Indent(S(10.0f));
 	isHeaderFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
     hasHeader = true;
 
@@ -198,9 +219,9 @@ void Widget::startHeader(string id, int height) {
  */
 void Widget::endHeader() {
 
-    ImGui::Unindent(10);
-    ImGui::SetCursorPos(ImVec2(0, 0));
-    ImGui::SetCursorPos(ImVec2(0, headerHeight-1));
+    ImGui::Unindent(S(10.0f));
+    ImGui::SetCursorPos(SV(0.0f, 0.0f));
+    ImGui::SetCursorPos(ImVec2(0.0f, static_cast<float>(headerHeight) - S(1.0f)));
     ImGui::Separator();
     ImGui::EndChild();
     ImGui::PopStyleVar();
@@ -214,16 +235,16 @@ void Widget::startBody(bool footer) {
 
     if (hasFooter) {
     }
-    ImGui::BeginChild("##body", ImVec2(size.x, (footer ? size.y-58 : size.y)));
-    ImGui::Dummy(ImVec2(20, 10));  // Adds top-left padding
-    ImGui::Indent(20);
+    ImGui::BeginChild("##body", ImVec2(size.x, (footer ? size.y - S(58.0f) : size.y)));
+    ImGui::Dummy(SV(20.0f, 10.0f));  // Adds top-left padding
+    ImGui::Indent(S(20.0f));
     isBodyFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
     ImGui::PushStyleColor(ImGuiCol_ChildBg, theme->panelBackground);
     ImGui::PushStyleColor(ImGuiCol_Text, theme->panelText);
 }
 
 void Widget::endBody() {
-    ImGui::Unindent(20);
+    ImGui::Unindent(S(20.0f));
 	ImGui::EndChild();
     ImGui::PopStyleColor();
 	ImGui::PopStyleColor();
@@ -235,18 +256,18 @@ void Widget::endBody() {
  */
 void Widget::startFooter() {
     Theme* theme = ThemeController::getInstance().getActiveTheme();
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, SV(0.0f, 0.0f));
     size = ImGui::GetContentRegionAvail();
-    ImGui::BeginChild("##footer", ImVec2(size.x, 58), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImDrawFlags_RoundCornersBottom);
+    ImGui::BeginChild("##footer", ImVec2(size.x, S(58.0f)), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImDrawFlags_RoundCornersBottom);
     isFooterFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-    ImGui::SetCursorPos(ImVec2(0, 0));
+    ImGui::SetCursorPos(SV(0.0f, 0.0f));
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     pos = ImGui::GetCursorScreenPos();
-    drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + 52), ImGui::ColorConvertFloat4ToU32(theme->panelFooter), 10, ImDrawFlags_RoundCornersBottom);
+    drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + S(52.0f)), ImGui::ColorConvertFloat4ToU32(theme->panelFooter), S(10.0f), ImDrawFlags_RoundCornersBottom);
 	ImGui::PopStyleVar();
 	ImGui::Separator();
-	ImGui::SetCursorPos(ImVec2(10, 10));
-    ImGui::Indent(10);
+	ImGui::SetCursorPos(SV(10.0f, 10.0f));
+    ImGui::Indent(S(10.0f));
 }
 
 /**
@@ -254,7 +275,7 @@ void Widget::startFooter() {
  *
  */
 void Widget::endFooter() {
-    ImGui::Unindent(10);
+    ImGui::Unindent(S(10.0f));
     ImGui::EndChild();
 }
 
@@ -275,7 +296,7 @@ void Widget::elLabel(std::string label) {
 
     ImGui::PushFont(AppFonts::label);
     ImGui::PushStyleColor(ImGuiCol_Text, theme->formLabel);
-    ImGui::SetNextItemWidth(size.x - 40);
+    ImGui::SetNextItemWidth(size.x - S(40.0f));
 	ImGui::Text(label.c_str());
 	ImGui::PopStyleColor();
     ImGui::PopFont();
@@ -289,8 +310,8 @@ void Widget::elHelp(std::string help) {
 
     ImGui::PushFont(AppFonts::input);
     ImGui::PushStyleColor(ImGuiCol_Text, theme->formHelpText);
-    ImGui::SetNextItemWidth(size.x - 60);
-    ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + size.x - 60);
+    ImGui::SetNextItemWidth(size.x - S(60.0f));
+    ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + size.x - S(60.0f));
 	ImGui::TextWrapped(help.c_str());
     ImGui::PopStyleColor();
 	ImGui::PopFont();
@@ -301,8 +322,8 @@ void Widget::elError(std::string error) {
 
     ImGui::PushFont(AppFonts::input);
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
-    ImGui::SetNextItemWidth(size.x - 60);
-    ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + size.x - 60);
+    ImGui::SetNextItemWidth(size.x - S(60.0f));
+    ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + size.x - S(60.0f));
     ImGui::TextWrapped(error.c_str());
     ImGui::PopTextWrapPos();
     ImGui::PopStyleColor();
@@ -317,12 +338,12 @@ void Widget::elParagraph(std::string text) {
 
     ImGui::PushFont(AppFonts::input);
     ImGui::PushStyleColor(ImGuiCol_Text, theme->panelText);
-    ImGui::SetNextItemWidth(size.x - 40);
-    ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + size.x - 60);
+    ImGui::SetNextItemWidth(size.x - S(40.0f));
+    ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + size.x - S(60.0f));
     ImGui::TextWrapped(text.c_str());
     ImGui::PopStyleColor();
     ImGui::PopFont();
-    ImGui::Dummy(ImVec2(0, 10.0f));
+    ImGui::Dummy(SV(0.0f, 10.0f));
 }
 
 bool Widget::elText(
@@ -344,7 +365,7 @@ bool Widget::elText(
     if (!label.empty()) {
         elLabel(label);
 	}
-    ImGui::SetNextItemWidth(width > 0.0f ? width : size.x - 20);
+    ImGui::SetNextItemWidth(width > 0.0f ? width : size.x - S(20.0f));
     ImGui::PushStyleColor(ImGuiCol_FrameBg, theme->formInputBackground);
     ImGui::PushStyleColor(ImGuiCol_Text, theme->formInputText);
 
@@ -383,10 +404,10 @@ bool Widget::elText(
     ImGui::PopStyleColor(2);
 
     if (!help.empty() || !error.empty()) {
-        ImGui::SetNextItemWidth(size.x - 20);
+        ImGui::SetNextItemWidth(size.x - S(20.0f));
         elHelp(help);
         elError(error);
-        ImGui::Dummy(ImVec2(0, 10.0f));
+        ImGui::Dummy(SV(0.0f, 10.0f));
     }
 
     return response;
@@ -403,7 +424,7 @@ void Widget::elReadOnly(std::string label, char* buffer, std::string help, std::
     if (!label.empty()) {
         elLabel(label);
     }
-    ImGui::SetNextItemWidth(size.x - 20);
+    ImGui::SetNextItemWidth(size.x - S(20.0f));
     ImGui::PushStyleColor(ImGuiCol_FrameBg, theme->formInputBackground);
     ImGui::PushStyleColor(ImGuiCol_Text, theme->formInputText);
     ImGui::PushStyleColor(ImGuiCol_Border, theme->formInputBorderActive);
@@ -414,12 +435,12 @@ void Widget::elReadOnly(std::string label, char* buffer, std::string help, std::
     ImGui::PopStyleColor();
     ImGui::PopStyleColor();
 
-    ImGui::SetNextItemWidth(size.x - 20);
+    ImGui::SetNextItemWidth(size.x - S(20.0f));
     elHelp(help);
     elError(error);
 
     if (!help.empty() || !error.empty()) {
-        ImGui::Dummy(ImVec2(0, 10.0f));
+        ImGui::Dummy(SV(0.0f, 10.0f));
     }
 }
 
@@ -436,7 +457,7 @@ bool Widget::elPassword(std::string label, char* buffer, std::string help, std::
     if (!label.empty()) {
         elLabel(label);
     }
-    ImGui::SetNextItemWidth(size.x - 20);
+    ImGui::SetNextItemWidth(size.x - S(20.0f));
     ImGui::PushStyleColor(ImGuiCol_FrameBg, theme->formInputBackground);
     ImGui::PushStyleColor(ImGuiCol_Text, theme->formInputText);
     if (!error.empty()) {
@@ -473,13 +494,13 @@ bool Widget::elPassword(std::string label, char* buffer, std::string help, std::
 
     ImGui::PopStyleColor(2);
 
-    ImGui::SetNextItemWidth(size.x - 20);
+    ImGui::SetNextItemWidth(size.x - S(20.0f));
     elHelp(help);
 
     elError(error);
 
     if (!help.empty() || !error.empty()) {
-        ImGui::Dummy(ImVec2(0, 10.0f));
+        ImGui::Dummy(SV(0.0f, 10.0f));
     }
 
     return response;
@@ -495,7 +516,7 @@ bool Widget::elNumber(std::string label, int& value, int from, int to, std::stri
     std::string inputLabel = "##" + label;
 
     elLabel(label);
-    ImGui::SetNextItemWidth(size.x-20);
+    ImGui::SetNextItemWidth(size.x - S(20.0f));
     ImGui::PushStyleColor(ImGuiCol_Text, theme->formInputText);
     ImGui::PushStyleColor(ImGuiCol_FrameBg, theme->formInputBackground);
     if (IntRangeWidget::render(label.c_str(), value, from, to, 0.025f)) {
@@ -506,13 +527,13 @@ bool Widget::elNumber(std::string label, int& value, int from, int to, std::stri
     }
     ImGui::PopStyleColor(2);
 
-    ImGui::SetNextItemWidth(size.x-20);
+    ImGui::SetNextItemWidth(size.x - S(20.0f));
     elHelp(help);
 
     elError(error);
 
     if (!help.empty() || !error.empty()) {
-        ImGui::Dummy(ImVec2(0, 10.0f));
+        ImGui::Dummy(SV(0.0f, 10.0f));
     }
 
     return response;
@@ -529,7 +550,7 @@ bool Widget::elTextArea(std::string label, char* buffer, std::string help, std::
     elLabel(label);
 
     ImVec2 boxSize(
-        avail.x - 20,
+        avail.x - S(20.0f),
         ImGui::GetTextLineHeight() * 6
     );
 
@@ -581,7 +602,7 @@ bool Widget::elTextArea(std::string label, char* buffer, std::string help, std::
     elError(error);
 
     if (!help.empty() || !error.empty()) {
-        ImGui::Dummy(ImVec2(0, 10.0f));
+        ImGui::Dummy(SV(0.0f, 10.0f));
     }
 
     return changed;
@@ -600,20 +621,20 @@ bool Widget::elCheckbox(std::string label, bool& isOn, std::string help, std::st
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, theme->formInputBackground);
     ImGui::PushStyleColor(ImGuiCol_FrameBgActive, theme->formInputBackground);
 
-    ImGui::SetNextItemWidth(size.x-20);
+    ImGui::SetNextItemWidth(size.x - S(20.0f));
     if (ImGui::Checkbox(label.c_str(), &isOn)) {
         response = true;
     }
     ImGui::PopStyleColor(4);
     ImGui::PopFont();
 
-    ImGui::SetNextItemWidth(size.x-20);
+    ImGui::SetNextItemWidth(size.x - S(20.0f));
     elHelp(help);
 
     elError(error);
 
     if (!help.empty() || !error.empty()) {
-        ImGui::Dummy(ImVec2(0, 10.0f));
+        ImGui::Dummy(SV(0.0f, 10.0f));
     }
 
     return response;
@@ -630,7 +651,7 @@ bool Widget::elSelect(std::string label,
     std::string inputLabel = "##" + label;
 
     elLabel(label);
-    ImGui::SetNextItemWidth(size.x-20);
+    ImGui::SetNextItemWidth(size.x - S(20.0f));
     ImGui::PushStyleColor(ImGuiCol_Text, theme->formInputText);
     ImGui::PushStyleColor(ImGuiCol_FrameBg, theme->formInputBackground);
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, theme->formInputBackground);
@@ -668,13 +689,13 @@ bool Widget::elSelect(std::string label,
 
     ImGui::PopStyleColor(8);
 
-    ImGui::SetNextItemWidth(size.x-20);
+    ImGui::SetNextItemWidth(size.x - S(20.0f));
     elHelp(help);
 
     elError(error);
 
     if (!help.empty() || !error.empty()) {
-        ImGui::Dummy(ImVec2(0, 10.0f));
+        ImGui::Dummy(SV(0.0f, 10.0f));
     }
 
     return itemSelected; // Return after everything is drawn
@@ -694,7 +715,7 @@ bool Widget::elMultiSelect(
     std::string inputLabel = "##" + label;
 
     elLabel(label);
-    ImGui::SetNextItemWidth(size.x - 20);
+    ImGui::SetNextItemWidth(size.x - S(20.0f));
 
     std::string preview;
     for (size_t i = 0; i < selectedValues.size(); ++i) {
@@ -759,7 +780,7 @@ bool Widget::elMultiSelect(
     elError(error);
 
     if (!help.empty() || !error.empty()) {
-        ImGui::Dummy(ImVec2(0, 10.0f));
+        ImGui::Dummy(SV(0.0f, 10.0f));
     }
 
     return changed;
@@ -776,7 +797,7 @@ bool Widget::elBtn(std::string label) {
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme->buttonPrimaryHovered);
     ImGui::PushStyleColor(ImGuiCol_Text, theme->buttonPrimaryText);
 
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, SV(10.0f, 5.0f));
 
     if (ImGui::Button(label.c_str())) {
 
@@ -808,7 +829,7 @@ bool Widget::elBtnSecondary(std::string label) {
 	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme->buttonSecondaryHovered);
     ImGui::PushStyleColor(ImGuiCol_Text, theme->buttonSecondaryText);
 
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, SV(10.0f, 5.0f));
     if (ImGui::Button(label.c_str())) {
 
         ImGui::PopStyleColor();

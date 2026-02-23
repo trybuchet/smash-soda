@@ -70,7 +70,8 @@ private:
 	bool _publicGame;
 	bool _latencyLimiter;
 	int32_t _latencyLimit;
-	size_t _selectedArtwork = -1;
+	int _selectedArtwork = -1;
+	string _selectedArtworkValue = "-1";
 	size_t _selectedTheme = 0;
 	size_t _selectedCategory = 0;
 

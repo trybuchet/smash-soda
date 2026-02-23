@@ -2,7 +2,7 @@
 <br />
 <p align="center">
   <img src="github/SmashSoda_icon_fill.png" style="width:200px;">
-  <h3 align="center">SmashSoda</h3>
+  <h3 align="center">Smash Soda</h3>
 
   <p align="center">
     Unofficial Tool for Hosting on Parsec
@@ -21,6 +21,8 @@
   <ol>
     <li>
       <a href="#about-the-project">About The Project</a>
+    <li><a href="#build-from-source-windows">Build from Source (Windows)</a></li>
+    <li><a href="#build-the-documentation-mkdocs">Build the Documentation (MkDocs)</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
@@ -70,6 +72,73 @@ The Discord Server is the best place to get support quickly.
         </td>
     </tr>
 </table>
+
+## Build from Source (Windows)
+
+You can build Smash Soda manually if you do not want to use the installer script.
+
+### Requirements
+
+- Git for Windows
+- CMake (3.18+), available on `PATH`
+- Visual Studio Build Tools with:
+  - Desktop development with C++
+  - MSVC C++ toolset
+  - Windows 10/11 SDK
+
+### Build commands
+
+From the repository root:
+
+```powershell
+cmake -S . -B build
+cmake --build build --config Release --parallel
+```
+
+Release executable:
+
+- `x64/Release/SmashSoda.exe`
+
+Optional debuggable build:
+
+```powershell
+cmake --build build --config RelWithDebInfo --parallel
+```
+
+Debuggable executable:
+
+- `x64/RelWithDebInfo/SmashSoda.exe`
+
+For the full docs version of this guide, see:
+`docs/content/getting-started/manual-build.md`
+
+## Build the Documentation (MkDocs)
+
+From the repository root:
+
+### Install docs dependencies
+
+```powershell
+python -m pip install mkdocs-material
+```
+
+### Run docs locally
+
+```powershell
+mkdocs serve -f docs/mkdocs.yml
+```
+
+Open `http://127.0.0.1:8000`.
+
+### Build static docs
+
+```powershell
+mkdocs build -f docs/mkdocs.yml
+```
+
+Generated output:
+
+- `docs/site/`
 
 ## Contributing
 

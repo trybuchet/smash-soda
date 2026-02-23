@@ -3,7 +3,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 title Smash Soda Installer
 
 :: --------- Admin check ----------
-set "SKIP_ADMIN_CHECK=1"
+if not defined SKIP_ADMIN_CHECK set "SKIP_ADMIN_CHECK=0"
 if not "%SKIP_ADMIN_CHECK%"=="1" (
   net session >nul 2>&1
   if %errorlevel% neq 0 (
@@ -28,6 +28,7 @@ if not "%SKIP_ADMIN_CHECK%"=="1" (
       echo Please right-click the installer and choose "Run as administrator".
       echo.
       pause >nul
+      exit /b 1
     )
   )
 )
@@ -76,20 +77,34 @@ set "STEP_CLEANUP=1"
 set "VS_BUILD_TOOLS_URL=https://aka.ms/vs/18/stable/vs_buildtools.exe"
 
 :: --------- Install location (folder picker) ----------
-set "DEFAULT_INSTALL=%ProgramFiles%\Smash Soda"
+set "DEFAULT_INSTALL_PARENT=%ProgramFiles%"
 echo.
-echo Please choose where to install Smash Soda.
-echo This folder will contain the app and its data.
+echo Please choose the parent folder for Smash Soda.
+echo A "Smash Soda" folder will be created there.
 echo.
 for /f "usebackq delims=" %%i in (`%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -Command ^
   "Add-Type -AssemblyName System.Windows.Forms; " ^
   "$dlg=New-Object System.Windows.Forms.FolderBrowserDialog; " ^
-  "$dlg.Description='Select the folder to install Smash Soda (e.g. C:\Program Files\Smash Soda)'; " ^
-  "$dlg.SelectedPath='%DEFAULT_INSTALL%'; " ^
+  "$dlg.Description='Select the parent folder for Smash Soda (e.g. C:\Program Files)'; " ^
+  "$dlg.SelectedPath='%DEFAULT_INSTALL_PARENT%'; " ^
   "$dlg.ShowNewFolderButton=$true; " ^
-  "if($dlg.ShowDialog() -eq 'OK'){ $dlg.SelectedPath }"`) do set "INSTALL_DIR=%%i"
-if "%INSTALL_DIR%"=="" set "INSTALL_DIR=%DEFAULT_INSTALL%"
+  "if($dlg.ShowDialog() -eq 'OK'){ $dlg.SelectedPath }"`) do set "INSTALL_PARENT=%%i"
+if "%INSTALL_PARENT%"=="" set "INSTALL_PARENT=%DEFAULT_INSTALL_PARENT%"
+
+:: Remove trailing slash for non-root paths so name checks are reliable.
+if "%INSTALL_PARENT:~-1%"=="\" (
+  if not "%INSTALL_PARENT:~1,2%"==":\" set "INSTALL_PARENT=%INSTALL_PARENT:~0,-1%"
+)
+
+:: If user already picked a Smash Soda folder, use it; otherwise create one under selected parent.
+for %%I in ("%INSTALL_PARENT%") do set "INSTALL_LEAF=%%~nxI"
+if /I "%INSTALL_LEAF%"=="Smash Soda" (
+  set "INSTALL_DIR=%INSTALL_PARENT%"
+) else (
+  set "INSTALL_DIR=%INSTALL_PARENT%\Smash Soda"
+)
 echo.
+echo Selected parent folder: "%INSTALL_PARENT%"
 echo Install folder: "%INSTALL_DIR%"
 
 :: --------- Work dirs ----------
@@ -101,6 +116,8 @@ set "DEPS_DIR=%SRC_DIR%\dependencies"
 set "OVERLAY_ZIP=%WORK%\smash-glass.zip"
 set "VIGEMBUS_SETUP=%WORK%\ViGEmBus_1.22.0_x64_x86_arm64.exe"
 set "VS_BOOTSTRAP=%WORK%\vs_BuildTools.exe"
+set "GIT_SETUP=%WORK%\Git-64-bit.exe"
+set "CMAKE_SETUP=%WORK%\cmake-windows-x86_64.msi"
 
 if exist "%WORK%" rmdir /s /q "%WORK%"
 mkdir "%WORK%" "%SRC%" "%BUILD%" 2>nul
@@ -140,6 +157,42 @@ echo Downloading %LABEL%...
 if errorlevel 1 exit /b 1
 exit /b 0
 
+:: --------- Helper: download latest GitHub release asset by regex ----------
+:download_latest_github_asset
+set "GH_REPO=%~1"
+set "GH_REGEX=%~2"
+set "GH_DEST=%~3"
+set "GH_LABEL=%~4"
+if "%GH_REPO%"=="" (
+  echo ERROR: GitHub repo is empty for "%GH_LABEL%".
+  exit /b 1
+)
+if "%GH_REGEX%"=="" (
+  echo ERROR: GitHub asset regex is empty for "%GH_LABEL%".
+  exit /b 1
+)
+if "%GH_DEST%"=="" (
+  echo ERROR: Destination is empty for "%GH_LABEL%".
+  exit /b 1
+)
+echo Downloading %GH_LABEL%...
+%PS% -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$repo='%GH_REPO%'; $regex='%GH_REGEX%'; $dest='%GH_DEST%'; " ^
+  "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; " ^
+  "try { " ^
+  "  $api = 'https://api.github.com/repos/' + $repo + '/releases/latest'; " ^
+  "  $rel = Invoke-RestMethod -Uri $api -Headers @{ 'User-Agent'='SmashSodaInstaller' }; " ^
+  "  $asset = $rel.assets | Where-Object { $_.name -match $regex } | Select-Object -First 1; " ^
+  "  if (-not $asset) { throw 'No matching asset found in latest release.' } " ^
+  "  Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $dest -UseBasicParsing; " ^
+  "} catch { " ^
+  "  Write-Host 'Download failed:'; " ^
+  "  Write-Host $_.Exception.Message; " ^
+  "  exit 1; " ^
+  "}"
+if errorlevel 1 exit /b 1
+exit /b 0
+
 :main
 
 :: --------- Install Git ----------
@@ -155,11 +208,37 @@ if %errorlevel% neq 0 (
   if %errorlevel% equ 0 (
     echo Using winget to install Git...
     winget install -e --id Git.Git --silent --accept-package-agreements --accept-source-agreements
+    set "WINGET_GIT_RC=!errorlevel!"
+    if not "!WINGET_GIT_RC!"=="0" if not "!WINGET_GIT_RC!"=="3010" (
+      echo WARNING: winget Git install failed with exit code !WINGET_GIT_RC!.
+      echo Falling back to direct Git installer download...
+      call :download_latest_github_asset "git-for-windows/git" "^Git-.*-64-bit\.exe$" "%GIT_SETUP%" "Git for Windows"
+      if errorlevel 1 (
+        echo ERROR: Failed to download Git installer.
+        pause
+        exit /b 1
+      )
+      start "" /wait "%GIT_SETUP%" /VERYSILENT /NORESTART /NOCANCEL /SP-
+      if errorlevel 1 (
+        echo ERROR: Git installer failed.
+        pause
+        exit /b 1
+      )
+    )
   ) else (
-    echo ERROR: winget is required to install Git automatically.
-    echo Please install winget ^(App Installer^) and rerun this installer.
-    pause
-    exit /b 1
+    echo winget not found. Falling back to direct Git installer download...
+    call :download_latest_github_asset "git-for-windows/git" "^Git-.*-64-bit\.exe$" "%GIT_SETUP%" "Git for Windows"
+    if errorlevel 1 (
+      echo ERROR: Failed to download Git installer.
+      pause
+      exit /b 1
+    )
+    start "" /wait "%GIT_SETUP%" /VERYSILENT /NORESTART /NOCANCEL /SP-
+    if errorlevel 1 (
+      echo ERROR: Git installer failed.
+      pause
+      exit /b 1
+    )
   )
 )
 
@@ -211,10 +290,40 @@ if not defined VSINSTALL (
   if %errorlevel% equ 0 (
     echo Using winget to install Visual Studio Build Tools 2026 with ATL support...
     winget install -e --id Microsoft.VisualStudio.BuildTools ^
-      --override "--wait --quiet --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --add Microsoft.VisualStudio.Component.VC.ATL --add Microsoft.VisualStudio.Component.Windows11SDK.22621 --includeRecommended"
+      --override "--wait --quiet --norestart --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --add Microsoft.VisualStudio.Component.VC.ATL --add Microsoft.VisualStudio.Component.Windows11SDK.22621 --includeRecommended"
+    set "WINGET_RC=!errorlevel!"
+    if not "!WINGET_RC!"=="0" if not "!WINGET_RC!"=="3010" (
+      echo WARNING: winget install failed with exit code !WINGET_RC!.
+      echo Falling back to direct Visual Studio Build Tools installer...
+      call :download "%VS_BUILD_TOOLS_URL%" "%VS_BOOTSTRAP%" "Visual Studio Build Tools"
+      if errorlevel 1 (
+        echo ERROR: Failed to download Visual Studio Build Tools installer.
+        pause
+        exit /b 1
+      )
+
+      echo Running Visual Studio Build Tools installer with ATL support...
+      "%VS_BOOTSTRAP%" --wait --quiet --norestart ^
+        --add Microsoft.VisualStudio.Workload.VCTools ^
+        --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 ^
+        --add Microsoft.VisualStudio.Component.VC.ATL ^
+        --add Microsoft.VisualStudio.Component.Windows11SDK.22621 ^
+        --includeRecommended
+      set "VSBT_RC=!errorlevel!"
+      if not "!VSBT_RC!"=="0" if not "!VSBT_RC!"=="3010" (
+        echo ERROR: Visual Studio Build Tools installer failed with exit code !VSBT_RC!.
+        pause
+        exit /b 1
+      )
+    )
   ) else (
     echo Downloading Visual Studio Build Tools installer...
     call :download "%VS_BUILD_TOOLS_URL%" "%VS_BOOTSTRAP%" "Visual Studio Build Tools"
+    if errorlevel 1 (
+      echo ERROR: Failed to download Visual Studio Build Tools installer.
+      pause
+      exit /b 1
+    )
     
     echo Running Visual Studio Build Tools installer with ATL support...
     "%VS_BOOTSTRAP%" --wait --quiet --norestart ^
@@ -223,27 +332,25 @@ if not defined VSINSTALL (
       --add Microsoft.VisualStudio.Component.VC.ATL ^
       --add Microsoft.VisualStudio.Component.Windows11SDK.22621 ^
       --includeRecommended
+    set "VSBT_RC=!errorlevel!"
+    if not "!VSBT_RC!"=="0" if not "!VSBT_RC!"=="3010" (
+      echo ERROR: Visual Studio Build Tools installer failed with exit code !VSBT_RC!.
+      pause
+      exit /b 1
+    )
   )
 
   echo Waiting for installation to complete...
   timeout /t 10 >nul
 
-  :: Wait for vswhere to appear and detect installation (max 5 minutes)
+  :: Wait for vswhere to appear
   set WAIT_COUNT=0
   :wait_vs
   if !WAIT_COUNT! GEQ 60 (
     echo.
-    echo ERROR: Visual Studio Build Tools installation timed out or failed.
-    echo Please install manually from: 
-    echo https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2026
-    echo.
-    echo Required components:
-    echo - Desktop development with C++
-    echo - MSVC v145 - VS 2026 C++ x64/x86 build tools
-    echo - Windows 11 SDK
-    echo - ATL for latest v145 build tools (x86 and x64)
-    pause
-    exit /b 1
+    echo WARNING: Visual Studio Build Tools detection timed out.
+    echo Continuing anyway. If build fails, reboot and rerun installer.
+    goto :after_install_build_tools
   )
   
   timeout /t 5 >nul
@@ -265,21 +372,21 @@ echo.
 echo Visual Studio Build Tools detected at:
 echo "%VSINSTALL%"
 
-:: CRITICAL: Initialize the VS environment before running CMake
+:: Initialize the VS environment
 echo.
 echo Initializing Visual Studio development environment...
 if exist "%VSINSTALL%\Common7\Tools\VsDevCmd.bat" (
   call "%VSINSTALL%\Common7\Tools\VsDevCmd.bat" -arch=amd64 -host_arch=amd64
   if !errorlevel! neq 0 (
-    echo ERROR: Failed to initialize Visual Studio environment
-    pause
-    exit /b 1
+    echo WARNING: Failed to initialize Visual Studio environment.
+    echo Continuing anyway. If build fails, reboot and rerun installer.
+    goto :after_install_build_tools
   )
 ) else (
-  echo ERROR: VsDevCmd.bat not found at expected location:
+  echo WARNING: VsDevCmd.bat not found at expected location:
   echo "%VSINSTALL%\Common7\Tools\VsDevCmd.bat"
-  pause
-  exit /b 1
+  echo Continuing anyway. If build fails, reboot and rerun installer.
+  goto :after_install_build_tools
 )
 
 echo C++ build environment is ready.
@@ -295,15 +402,43 @@ if "%STEP_INSTALL_CMAKE%"=="0" (
 where cmake >nul 2>&1
 if %errorlevel% neq 0 (
   where winget >nul 2>&1
-  if %errorlevel% neq 0 (
-    echo ERROR: winget is required to install CMake automatically.
-    echo Please install winget ^(App Installer^) and rerun this installer.
-    pause
-    exit /b 1
+  if %errorlevel% equ 0 (
+    echo Using winget to install CMake...
+    winget install -e --id Kitware.CMake --silent --accept-package-agreements --accept-source-agreements
+    set "WINGET_CMAKE_RC=!errorlevel!"
+    if not "!WINGET_CMAKE_RC!"=="0" if not "!WINGET_CMAKE_RC!"=="3010" (
+      echo WARNING: winget CMake install failed with exit code !WINGET_CMAKE_RC!.
+      echo Falling back to direct CMake installer download...
+      call :download_latest_github_asset "Kitware/CMake" "^cmake-.*-windows-x86_64\.msi$" "%CMAKE_SETUP%" "CMake"
+      if errorlevel 1 (
+        echo ERROR: Failed to download CMake installer.
+        pause
+        exit /b 1
+      )
+      msiexec /i "%CMAKE_SETUP%" /qn /norestart ADD_CMAKE_TO_PATH=System
+      if errorlevel 1 (
+        echo ERROR: CMake installer failed.
+        pause
+        exit /b 1
+      )
+    )
+    timeout /t 5 >nul
+  ) else (
+    echo winget not found. Falling back to direct CMake installer download...
+    call :download_latest_github_asset "Kitware/CMake" "^cmake-.*-windows-x86_64\.msi$" "%CMAKE_SETUP%" "CMake"
+    if errorlevel 1 (
+      echo ERROR: Failed to download CMake installer.
+      pause
+      exit /b 1
+    )
+    msiexec /i "%CMAKE_SETUP%" /qn /norestart ADD_CMAKE_TO_PATH=System
+    if errorlevel 1 (
+      echo ERROR: CMake installer failed.
+      pause
+      exit /b 1
+    )
+    timeout /t 5 >nul
   )
-  echo Using winget to install CMake...
-  winget install -e --id Kitware.CMake --silent --accept-package-agreements --accept-source-agreements
-  timeout /t 5 >nul
 )
 
 :: Add CMake to PATH manually if needed
@@ -329,11 +464,22 @@ if "%STEP_INSTALL_VIGEMBUS%"=="0" (
   goto :after_install_vigembus
 )
 call :download "%VIGEMBUS_URL%" "%VIGEMBUS_SETUP%" "ViGEmBus Driver"
-if not exist "%VIGEMBUS_SETUP%" (
-  echo ERROR: ViGEmBus installer was not downloaded.
+if errorlevel 1 (
+  echo ERROR: Failed to download ViGEmBus installer.
+  pause
   exit /b 1
 )
-"%VIGEMBUS_SETUP%" /qn
+if not exist "%VIGEMBUS_SETUP%" (
+  echo ERROR: ViGEmBus installer was not downloaded.
+  pause
+  exit /b 1
+)
+start "" /wait "%VIGEMBUS_SETUP%" /qn
+if errorlevel 1 (
+  echo ERROR: ViGEmBus installer failed.
+  pause
+  exit /b 1
+)
 :after_install_vigembus
 
 :: --------- Clone source ----------
@@ -390,14 +536,22 @@ if "%STEP_INSTALL_APP%"=="0" (
   echo Skipped [8/8] Install app files.
   goto :after_install_app
 )
-set "RELEASE_DIR=%SRC_DIR%\x64\release"
-if not exist "%RELEASE_DIR%" (
-  set "RELEASE_DIR=%BUILD%\Release"
+set "RELEASE_DIR="
+if exist "%SRC_DIR%\x64\release\SmashSoda.exe" set "RELEASE_DIR=%SRC_DIR%\x64\release"
+if not defined RELEASE_DIR if exist "%SRC_DIR%\x64\Release\SmashSoda.exe" set "RELEASE_DIR=%SRC_DIR%\x64\Release"
+if not defined RELEASE_DIR if exist "%BUILD%\Release\SmashSoda.exe" set "RELEASE_DIR=%BUILD%\Release"
+if not defined RELEASE_DIR if exist "%BUILD%\SmashSoda\Release\SmashSoda.exe" set "RELEASE_DIR=%BUILD%\SmashSoda\Release"
+if not defined RELEASE_DIR (
+  for /f "delims=" %%F in ('dir /b /s "%BUILD%\SmashSoda.exe" 2^>nul') do (
+    if not defined RELEASE_DIR set "RELEASE_DIR=%%~dpF"
+  )
 )
-if not exist "%RELEASE_DIR%" (
+if not defined RELEASE_DIR (
   echo ERROR: Release output not found. Checked:
-  echo   "%SRC_DIR%\x64\release"
-  echo   "%BUILD%\Release"
+  echo   "%SRC_DIR%\x64\release\SmashSoda.exe"
+  echo   "%SRC_DIR%\x64\Release\SmashSoda.exe"
+  echo   "%BUILD%\Release\SmashSoda.exe"
+  echo   "%BUILD%\SmashSoda\Release\SmashSoda.exe"
   pause
   exit /b 1
 )
@@ -462,7 +616,22 @@ echo.
 echo Installing Smash Glass overlay...
 mkdir "%OVERLAY_DIR%" 2>nul
 call :download "%SMASH_GLASS_URL%" "%OVERLAY_ZIP%" "Smash Glass"
+if errorlevel 1 (
+  echo ERROR: Failed to download Smash Glass overlay.
+  pause
+  exit /b 1
+)
+if not exist "%OVERLAY_ZIP%" (
+  echo ERROR: Overlay archive not found after download: "%OVERLAY_ZIP%"
+  pause
+  exit /b 1
+)
 %PS% -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%OVERLAY_ZIP%' -DestinationPath '%OVERLAY_DIR%' -Force"
+if errorlevel 1 (
+  echo ERROR: Failed to extract Smash Glass overlay archive.
+  pause
+  exit /b 1
+)
 del /f /q "%OVERLAY_ZIP%" >nul 2>&1
 if not exist "%OVERLAY_DIR%\plugins" mkdir "%OVERLAY_DIR%\plugins"
 if not exist "%OVERLAY_DIR%\themes" mkdir "%OVERLAY_DIR%\themes"

@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="ChatCommands.html">
+        <link rel="prev" href="install.html">
       
       
-        <link rel="next" href="../overlay/Overview.html">
+        <link rel="next" href="overview.html">
       
       
         
@@ -23,7 +23,7 @@
     
     
       
-        <title>Sound Effects - Smash Soda Documentation</title>
+        <title>Manual Build (Windows) - Smash Soda Documentation</title>
       
     
     
@@ -75,6 +75,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#manual-build-windows" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -106,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Sound Effects
+              Manual Build (Windows)
             
           </span>
         </div>
@@ -227,8 +232,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -239,11 +246,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
@@ -264,7 +271,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -282,7 +289,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/install.html" class="md-nav__link">
+      <a href="install.html" class="md-nav__link">
         
   
   
@@ -307,10 +314,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../getting-started/manual-build.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Build (Windows)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="manual-build.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -326,6 +360,81 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-clone-the-repository" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1) Clone the repository
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-configure-cmake" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2) Configure CMake
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-build-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3) Build Release
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-optional-build-a-debuggable-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4) Optional: build a debuggable version
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -338,7 +447,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/overview.html" class="md-nav__link">
+      <a href="overview.html" class="md-nav__link">
         
   
   
@@ -366,7 +475,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/quickstart.html" class="md-nav__link">
+      <a href="quickstart.html" class="md-nav__link">
         
   
   
@@ -394,7 +503,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/development.html" class="md-nav__link">
+      <a href="development.html" class="md-nav__link">
         
   
   
@@ -422,7 +531,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/migration.html" class="md-nav__link">
+      <a href="migration.html" class="md-nav__link">
         
   
   
@@ -877,8 +986,6 @@
       
   
   
-    
-  
   
   
     
@@ -891,11 +998,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
           <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
@@ -916,7 +1023,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -934,7 +1041,7 @@
   
   
     <li class="md-nav__item">
-      <a href="ChatCommands.html" class="md-nav__link">
+      <a href="../features/ChatCommands.html" class="md-nav__link">
         
   
   
@@ -959,17 +1066,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-      <a href="SFX.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../features/SFX.html" class="md-nav__link">
         
   
   
@@ -985,7 +1085,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -1189,6 +1288,71 @@
   
   
   
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-clone-the-repository" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1) Clone the repository
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-configure-cmake" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2) Configure CMake
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-build-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3) Build Release
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-optional-build-a-debuggable-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4) Optional: build a debuggable version
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -1205,9 +1369,38 @@
 
 
 
-  <h1>Sound Effects</h1>
-
-
+<h1 id="manual-build-windows">Manual Build (Windows)<a class="headerlink" href="#manual-build-windows" title="Permanent link">&para;</a></h1>
+<p>If the installer script does not work for your system, you can build Smash Soda manually.</p>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Git for Windows</li>
+<li>CMake (3.18 or newer), added to <code>PATH</code></li>
+<li>Visual Studio Build Tools with:</li>
+<li>Desktop development with C++</li>
+<li>MSVC C++ toolset</li>
+<li>Windows 10/11 SDK</li>
+</ul>
+<h2 id="1-clone-the-repository">1) Clone the repository<a class="headerlink" href="#1-clone-the-repository" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">://</span><span class="n">github</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">soda-arcade</span><span class="p">/</span><span class="n">smash-soda</span><span class="p">.</span><span class="n">git</span>
+<span class="nb">cd </span><span class="n">smash-soda</span>
+</code></pre></div>
+<h2 id="2-configure-cmake">2) Configure CMake<a class="headerlink" href="#2-configure-cmake" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="n">cmake</span> <span class="n">-S</span> <span class="p">.</span> <span class="n">-B</span> <span class="n">build</span>
+</code></pre></div>
+<h2 id="3-build-release">3) Build Release<a class="headerlink" href="#3-build-release" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="n">cmake</span> <span class="p">-</span><span class="n">-build</span> <span class="n">build</span> <span class="p">-</span><span class="n">-config</span> <span class="n">Release</span> <span class="p">-</span><span class="n">-parallel</span>
+</code></pre></div>
+<p>Output executable:</p>
+<ul>
+<li><code>x64/Release/SmashSoda.exe</code></li>
+</ul>
+<h2 id="4-optional-build-a-debuggable-version">4) Optional: build a debuggable version<a class="headerlink" href="#4-optional-build-a-debuggable-version" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="n">cmake</span> <span class="p">-</span><span class="n">-build</span> <span class="n">build</span> <span class="p">-</span><span class="n">-config</span> <span class="n">RelWithDebInfo</span> <span class="p">-</span><span class="n">-parallel</span>
+</code></pre></div>
+<p>Output executable:</p>
+<ul>
+<li><code>x64/RelWithDebInfo/SmashSoda.exe</code></li>
+</ul>
 
 
 

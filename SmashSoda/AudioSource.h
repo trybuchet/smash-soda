@@ -4,6 +4,8 @@
 #include <mmsystem.h>
 #include <string>
 #include <vector>
+#include <deque>
+#include <cstdint>
 #include <iostream>
 #include <mutex>
 #include <functiondiscoverykeys.h>
@@ -34,7 +36,7 @@ typedef struct AudioSourceDevice
 {
 	std::string name;
 	std::string id;
-	size_t index;
+	size_t index = 0;
 } AudioSourceDevice;
 
 #define CLSID_MMDeviceEnumerator ((const CLSID) __uuidof(MMDeviceEnumerator))
@@ -69,6 +71,7 @@ protected:
 		Unknown,
 		Float32,
 		Int16,
+		Int24,
 		Int32
 	};
 
@@ -89,6 +92,7 @@ protected:
 
 	vector<AudioSourceDevice> m_devices;
 	vector<int16_t> m_buffers[2];
+	std::deque<std::vector<int16_t>> m_readyBuffers;
 	int m_activeBuffer = 0;
 	bool m_isReady = false;
 	int m_previewIndex = 0;
@@ -96,6 +100,7 @@ protected:
 	float m_plotBuffer[AUDIOSRC_SAMPLES_PER_BUFFER];
 
 	size_t m_maxBufferSize = 0;
+	size_t m_maxReadyBuffers = 24;
 
 
 	uint32_t m_frequency = 48000;  // Default to 48kHz (Parsec's preferred rate)

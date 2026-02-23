@@ -59,12 +59,20 @@ static ID3D11RenderTargetView* g_mainRenderTargetView = NULL;
 Hosting g_hosting;
 static HHOOK g_keyboardHook = NULL;
 static HHOOK g_mouseHook = NULL;
+static HANDLE g_hookThread = NULL;
+static DWORD g_hookThreadId = 0;
+static HANDLE g_hookReadyEvent = NULL;
+static float g_uiScale = 1.0f;
 
 // Forward declarations of helper functions
 bool CreateDeviceD3D(HWND hWnd);
 void CleanupDeviceD3D();
 void CreateRenderTarget();
 void CleanupRenderTarget();
+bool StartInputHooks();
+void StopInputHooks();
+void ApplyWindowDpiScale(HWND hWnd);
+DWORD WINAPI InputHookThreadProc(LPVOID);
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam);
@@ -74,7 +82,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
 {
 
     // Create application window
-    //ImGui_ImplWin32_EnableDpiAwareness();
+    ImGui_ImplWin32_EnableDpiAwareness();
 
     // Load config
     Config::cfg.Load();
@@ -114,8 +122,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
     ::ShowWindow(hwnd, SW_SHOWDEFAULT);
     ::UpdateWindow(hwnd);
 
-    g_keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, GetModuleHandle(NULL), 0);
-    g_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, LowLevelMouseProc, GetModuleHandle(NULL), 0);
+    StartInputHooks();
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -146,6 +153,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
 
     // Apply default theme
     ThemeController::getInstance().applyTheme(Config::cfg.general.theme);
+    ApplyWindowDpiScale(hwnd);
 
     HostSettingsWidget hostSettingsWindow(g_hosting, [&hwnd](bool isRunning) {
         SetWindowTextW(hwnd, isRunning ? L"⚫ [LIVE] Smash Soda" : L"Smash Soda");
@@ -163,7 +171,9 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
     LibraryWidget libraryWidget(g_hosting);
     OverlayWidget overlayWidget(g_hosting);
     HotseatWidget hotseatWidget(g_hosting);
-    VersionWidget versionWidget;
+    VersionWidget versionWidget([&hostSettingsWindow]() {
+        hostSettingsWindow.updateSecretLink();
+    });
     DeveloperWidget developerWidget(g_hosting);
     BackgroundWidget backgroundWidget;
     StreamingWidget streamingWidget;
@@ -267,11 +277,9 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
 
             // Hotkeys
             if (msg.message == WM_HOTKEY) {
-                // Loop through Config::cfg.hotkey.keys (index is the hotkey id)
-                for (int i = 0; i < Config::cfg.hotkeys.keys.size(); i++) {
-                    if (msg.wParam == i) {
-						g_hosting.sendHostMessage(Config::cfg.hotkeys.keys[i].command.c_str());
-					}
+                const int hotkeyId = static_cast<int>(msg.wParam);
+                if (hotkeyId >= 0 && hotkeyId < static_cast<int>(Config::cfg.hotkeys.keys.size())) {
+					g_hosting.sendHostMessage(Config::cfg.hotkeys.keys[hotkeyId].command.c_str());
 				}
             }
 
@@ -399,14 +407,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
     // Make sure all pads completely removed
     GamepadClient::instance.disconnectAllGamepads();
 
-    if (g_keyboardHook != NULL) {
-        UnhookWindowsHookEx(g_keyboardHook);
-        g_keyboardHook = NULL;
-    }
-    if (g_mouseHook != NULL) {
-        UnhookWindowsHookEx(g_mouseHook);
-        g_mouseHook = NULL;
-    }
+    StopInputHooks();
 
     CleanupDeviceD3D();
     ::DestroyWindow(hwnd);
@@ -414,13 +415,117 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
 
     // Unregister Hotkeys
     for (int i = 0; i < Config::cfg.hotkeys.keys.size(); i++) {
-		UnregisterHotKey(hwnd, i+1);
+		UnregisterHotKey(hwnd, i);
 	}
 
     return 0;
 }
 
 // Helper functions
+
+bool StartInputHooks()
+{
+    if (g_hookThread != NULL) {
+        return true;
+    }
+
+    g_hookReadyEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    if (g_hookReadyEvent == NULL) {
+        return false;
+    }
+
+    g_hookThread = CreateThread(NULL, 0, InputHookThreadProc, NULL, 0, &g_hookThreadId);
+    if (g_hookThread == NULL) {
+        CloseHandle(g_hookReadyEvent);
+        g_hookReadyEvent = NULL;
+        g_hookThreadId = 0;
+        return false;
+    }
+
+    const DWORD waitResult = WaitForSingleObject(g_hookReadyEvent, 5000);
+    CloseHandle(g_hookReadyEvent);
+    g_hookReadyEvent = NULL;
+
+    if (waitResult != WAIT_OBJECT_0 || g_keyboardHook == NULL || g_mouseHook == NULL) {
+        StopInputHooks();
+        return false;
+    }
+
+    return true;
+}
+
+void StopInputHooks()
+{
+    if (g_hookThreadId != 0) {
+        PostThreadMessage(g_hookThreadId, WM_QUIT, 0, 0);
+    }
+
+    if (g_hookThread != NULL) {
+        WaitForSingleObject(g_hookThread, 2000);
+        CloseHandle(g_hookThread);
+        g_hookThread = NULL;
+    }
+
+    g_hookThreadId = 0;
+
+    if (g_keyboardHook != NULL) {
+        UnhookWindowsHookEx(g_keyboardHook);
+        g_keyboardHook = NULL;
+    }
+
+    if (g_mouseHook != NULL) {
+        UnhookWindowsHookEx(g_mouseHook);
+        g_mouseHook = NULL;
+    }
+}
+
+void ApplyWindowDpiScale(HWND hWnd)
+{
+    if (hWnd == NULL || ImGui::GetCurrentContext() == nullptr) {
+        return;
+    }
+
+    const float dpiScale = ImGui_ImplWin32_GetDpiScaleForHwnd(hWnd);
+    if (dpiScale <= 0.0f) {
+        return;
+    }
+
+    g_uiScale = dpiScale;
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.FontGlobalScale = g_uiScale;
+
+    ThemeController::getInstance().setUiScale(g_uiScale);
+}
+
+DWORD WINAPI InputHookThreadProc(LPVOID)
+{
+    MSG msg;
+    PeekMessage(&msg, NULL, WM_USER, WM_USER, PM_NOREMOVE);
+
+    const HMODULE module = GetModuleHandle(NULL);
+    g_keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, module, 0);
+    g_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, LowLevelMouseProc, module, 0);
+
+    if (g_hookReadyEvent != NULL) {
+        SetEvent(g_hookReadyEvent);
+    }
+
+    while (GetMessage(&msg, NULL, 0, 0) > 0) {
+    }
+
+    if (g_keyboardHook != NULL) {
+        UnhookWindowsHookEx(g_keyboardHook);
+        g_keyboardHook = NULL;
+    }
+
+    if (g_mouseHook != NULL) {
+        UnhookWindowsHookEx(g_mouseHook);
+        g_mouseHook = NULL;
+    }
+
+    return 0;
+}
 
 bool CreateDeviceD3D(HWND hWnd)
 {
@@ -510,6 +615,20 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			}
 		}
         return 0;
+    case WM_DPICHANGED:
+        if (lParam != 0) {
+            const RECT* suggestedRect = reinterpret_cast<RECT*>(lParam);
+            ::SetWindowPos(
+                hWnd, NULL,
+                suggestedRect->left, suggestedRect->top,
+                suggestedRect->right - suggestedRect->left,
+                suggestedRect->bottom - suggestedRect->top,
+                SWP_NOZORDER | SWP_NOACTIVATE
+            );
+        }
+
+        ApplyWindowDpiScale(hWnd);
+        return 0;
     case WM_SYSCOMMAND:
         if ((wParam & 0xfff0) == SC_KEYMENU) // Disable ALT application menu
             return 0;
@@ -536,7 +655,7 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
-    if (nCode == HC_ACTION) {
+    if (nCode == HC_ACTION && g_hosting.isRunning()) {
         const KBDLLHOOKSTRUCT* keyboard = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
         if (keyboard != nullptr &&
             (keyboard->flags & LLKHF_INJECTED) == 0 &&
@@ -550,11 +669,22 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 
 LRESULT CALLBACK LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
-    if (nCode == HC_ACTION) {
+    static ULONGLONG lastHostMoveNote = 0;
+    static const ULONGLONG HOST_MOVE_NOTE_INTERVAL_MS = 8;
+
+    if (nCode == HC_ACTION && g_hosting.isRunning()) {
         const MSLLHOOKSTRUCT* mouse = reinterpret_cast<MSLLHOOKSTRUCT*>(lParam);
         if (mouse != nullptr && (mouse->flags & LLMHF_INJECTED) == 0) {
             switch (wParam) {
             case WM_MOUSEMOVE:
+            {
+                const ULONGLONG now = GetTickCount64();
+                if (now - lastHostMoveNote >= HOST_MOVE_NOTE_INTERVAL_MS) {
+                    lastHostMoveNote = now;
+                    InputControlService::instance().noteHostPhysicalInput();
+                }
+                break;
+            }
             case WM_LBUTTONDOWN:
             case WM_LBUTTONUP:
             case WM_RBUTTONDOWN:

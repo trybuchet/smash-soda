@@ -33,7 +33,7 @@ namespace {
 Cache::Cache() {
 
 	// Set the version
-	version = "7.0.0";
+	version = "7.0.1";
 
     // Load verified users
     vector<GuestData> verified = VerifiedList::LoadFromFile();

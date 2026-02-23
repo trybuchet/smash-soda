@@ -3,7 +3,8 @@
 #include <shellapi.h>
 
 // Constructor
-VersionWidget::VersionWidget() {
+VersionWidget::VersionWidget(function<void()> onSodaArcadeLogin)
+    : _onSodaArcadeLogin(onSodaArcadeLogin) {
 	version = Cache::cache.version;
 	latestVersion = "";
 	changeLog = "";
@@ -15,47 +16,71 @@ VersionWidget::VersionWidget() {
 
 bool VersionWidget::render() {
 
+    if (_pendingSodaArcadeLoginRefresh.exchange(false) && _onSodaArcadeLogin) {
+        _onSodaArcadeLogin();
+    }
+
     Theme* theme = ThemeController::getInstance().getActiveTheme();
 
     static ImVec2 res;
-    static ImVec2 cursor;
-
     res = ImGui::GetMainViewport()->Size;
-    cursor = ImGui::GetCursorPos();
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8,8));
+    float uiScale = ThemeController::getInstance().getUiScale();
+    if (uiScale < 1.0f) {
+        uiScale = 1.0f;
+    }
+    const ImVec2 padding = ImVec2(8.0f * uiScale, 8.0f * uiScale);
+    const float margin = 10.0f * uiScale;
+    const float groupGap = 24.0f * uiScale;
+
+    const std::string versionValue = version.empty() ? "-" : version;
+    const std::string fpsValue = std::to_string(static_cast<int>(ImGui::GetIO().Framerate + 0.5f));
+
+    const ImVec2 versionLabelSize = ImGui::CalcTextSize("Version ");
+    const ImVec2 versionValueSize = ImGui::CalcTextSize(versionValue.c_str());
+    const ImVec2 fpsLabelSize = ImGui::CalcTextSize("FPS ");
+    const ImVec2 fpsValueSize = ImGui::CalcTextSize(fpsValue.c_str());
+
+    const float leftGroupWidth = versionLabelSize.x + versionValueSize.x;
+    const float rightGroupWidth = fpsLabelSize.x + fpsValueSize.x;
+    const float contentWidth = leftGroupWidth + groupGap + rightGroupWidth;
+    const float windowWidth = contentWidth + padding.x * 2.0f;
+    const float windowHeight = ImGui::GetTextLineHeight() + padding.y * 2.0f;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, padding);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
     ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 0);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0,0,0,0));
 
-    ImGui::SetNextWindowPos(ImVec2(10, res.y - 42));
-    ImGui::SetNextWindowSize(ImVec2(240, 52));
+    ImGui::SetNextWindowPos(ImVec2(margin, res.y - windowHeight - margin));
+    ImGui::SetNextWindowSize(ImVec2(windowWidth, windowHeight));
     ImGui::PushFont(AppFonts::label);
     ImGui::Begin("##Version", (bool*)0, ImGuiWindowFlags_NoDecoration);
 
     ImGui::PushStyleColor(ImGuiCol_Text, theme->formLabel);
-    ImGui::Text("Version ");
+    ImGui::TextUnformatted("Version ");
     ImGui::PopStyleColor();
 
-    ImGui::SameLine();
+    ImGui::SameLine(0.0f, 0.0f);
 
     ImGui::PushStyleColor(ImGuiCol_Text, theme->text);
-    ImGui::Text(version.c_str());
+    ImGui::TextUnformatted(versionValue.c_str());
     ImGui::PopStyleColor();
 
-    ImGui::SameLine();
-    ImGui::Indent(100.0);
+    const float rightCursorX = ImGui::GetWindowContentRegionMax().x - rightGroupWidth;
+    ImGui::SetCursorPosX(rightCursorX);
+
     ImGui::PushStyleColor(ImGuiCol_Text, theme->formLabel);
-    ImGui::Text("FPS ");
+    ImGui::TextUnformatted("FPS ");
     ImGui::PopStyleColor();
 
-    ImGui::SameLine();
+    ImGui::SameLine(0.0f, 0.0f);
 
     ImGui::PushStyleColor(ImGuiCol_Text, theme->text);
-    ImGui::Text("%.0f", ImGui::GetIO().Framerate);
+    ImGui::TextUnformatted(fpsValue.c_str());
     ImGui::PopStyleColor();
-    ImGui::Unindent(120.0);
+
     ImGui::End();
 
     //ImGui::PopStyleColor();
@@ -154,6 +179,7 @@ bool VersionWidget::renderLoginWindow() {
                     if (Arcade::instance.login(email, password, twoFactor)) {
                         Config::cfg.arcade.showLogin = false;
                         Config::cfg.Save();
+                        _pendingSodaArcadeLoginRefresh = true;
                     } else {
                         error = "Invalid e-mail or password.";
                         _showError = true;

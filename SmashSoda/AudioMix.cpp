@@ -61,7 +61,8 @@ std::vector<int16_t> AudioMix::resample(const std::vector<int16_t>& buffer, uint
 	if (srcFrames < 2) {
 		return buffer;
 	}
-	size_t dstFrames = (size_t)((double)srcFrames * dstRate / srcRate);
+	const uint64_t scaledFrames = static_cast<uint64_t>(srcFrames) * static_cast<uint64_t>(dstRate);
+	size_t dstFrames = static_cast<size_t>((scaledFrames + (srcRate / 2)) / srcRate);
 	
 	if (dstFrames == 0) {
 		return buffer;

@@ -105,20 +105,46 @@ endif()
 # --------------------------
 # Link libraries (x86/x64 aware)
 # --------------------------
-if("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "x64")
+if(DEFINED ARCH AND ARCH STREQUAL "x64")
+    set(TARGET_ARCH "x64")
+elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(TARGET_ARCH "x64")
+else()
+    set(TARGET_ARCH "x86")
+endif()
+
+if(TARGET_ARCH STREQUAL "x64")
     set(PARSECLIB parsec)
     set(SDL2LIB_DIR "${CMAKE_SOURCE_DIR}/Dependencies/sdl/lib/x64")
-    set(VIGEM_DIR "${CMAKE_SOURCE_DIR}/Dependencies/vigem/lib/release/x64")
+    set(VIGEM_ARCH_DIR "x64")
     set(MATOYA_DIR "${CMAKE_SOURCE_DIR}/Dependencies/matoya/64")
+    set(NVENC_SHIM_DLL "")
+    if(EXISTS "${CMAKE_SOURCE_DIR}/dependencies/nvenc_shim/nvEncodeAPI64.dll")
+        set(NVENC_SHIM_DLL "${CMAKE_SOURCE_DIR}/dependencies/nvenc_shim/nvEncodeAPI64.dll")
+    elseif(EXISTS "${CMAKE_SOURCE_DIR}/dependencies/nvenc_shim/vnEncodeAPI64.dll")
+        # Backward-compatible fallback if the file was named with transposed letters.
+        set(NVENC_SHIM_DLL "${CMAKE_SOURCE_DIR}/dependencies/nvenc_shim/vnEncodeAPI64.dll")
+    endif()
 else()
     set(PARSECLIB parsec32)
     set(SDL2LIB_DIR "${CMAKE_SOURCE_DIR}/Dependencies/sdl/lib/x86")
-    set(VIGEM_DIR "${CMAKE_SOURCE_DIR}/Dependencies/vigem/bin/release32")
+    set(VIGEM_ARCH_DIR "x86")
     set(MATOYA_DIR "${CMAKE_SOURCE_DIR}/Dependencies/matoya/32")
 endif()
 
+set(VIGEM_RELEASE_LIB "${CMAKE_SOURCE_DIR}/Dependencies/vigem/lib/release/${VIGEM_ARCH_DIR}/ViGEmClient.lib")
+set(VIGEM_DEBUG_LIB "${CMAKE_SOURCE_DIR}/Dependencies/vigem/lib/debug/${VIGEM_ARCH_DIR}/ViGEmClient.lib")
+
+if(NOT EXISTS "${VIGEM_RELEASE_LIB}")
+    message(FATAL_ERROR "Missing ViGEm release library: ${VIGEM_RELEASE_LIB}")
+endif()
+
+if(NOT EXISTS "${VIGEM_DEBUG_LIB}")
+    # Fallback keeps debug builds usable if only release import lib is available.
+    set(VIGEM_DEBUG_LIB "${VIGEM_RELEASE_LIB}")
+endif()
+
 target_link_directories(${PROJECT_NAME} PRIVATE
-    ${VIGEM_DIR}
     "${CMAKE_SOURCE_DIR}/Dependencies/parsecsdk/windows"
     ${MATOYA_DIR}
     ${SDL2LIB_DIR}
@@ -127,7 +153,8 @@ target_link_directories(${PROJECT_NAME} PRIVATE
 target_link_libraries(${PROJECT_NAME} PRIVATE
     ${PARSECLIB}
     matoya
-    ViGEmClient
+    debug "${VIGEM_DEBUG_LIB}"
+    optimized "${VIGEM_RELEASE_LIB}"
     SDL2
     SDL2main
     Winhttp
@@ -177,3 +204,14 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
         "${SDL2LIB_DIR}/SDL2.dll" $<TARGET_FILE_DIR:${PROJECT_NAME}>
 )
+
+if(TARGET_ARCH STREQUAL "x64")
+    if(NVENC_SHIM_DLL)
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${NVENC_SHIM_DLL}" $<TARGET_FILE_DIR:${PROJECT_NAME}>
+        )
+    else()
+        message(WARNING "NVENC shim DLL not found at dependencies/nvenc_shim/(n|v)nEncodeAPI64.dll; skipping post-build copy.")
+    endif()
+endif()

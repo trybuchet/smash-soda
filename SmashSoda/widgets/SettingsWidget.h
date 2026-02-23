@@ -63,7 +63,7 @@ private:
 	bool _saveChat;
 	bool _hotkeyBB;
 	bool _hotkeyLock;
-	bool _showHotkeyForm;
+	bool _showHotkeyForm = false;
 
 	bool _guestBB = false;
 	bool _vipBB = false;

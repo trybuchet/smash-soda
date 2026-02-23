@@ -1,0 +1,30 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "SmashSoda Debug (CMake)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/x64/RelWithDebInfo/SmashSoda.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/x64/RelWithDebInfo",
+            "environment": [],
+            "stopAtEntry": false,
+            "console": "integratedTerminal",
+            "preLaunchTask": "cmake-build-debug"
+        },
+        {
+            "name": "SmashSoda Release (CMake)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/x64/Release/SmashSoda.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/x64/Release",
+            "environment": [],
+            "stopAtEntry": false,
+            "console": "integratedTerminal",
+            "preLaunchTask": "cmake-build-release",
+            "noDebug": true
+        }
+    ]
+}

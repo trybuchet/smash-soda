@@ -17,9 +17,7 @@
 bool AudioSource::setDevice(int index)
 {
 	HRESULT hr;
-	size_t REFTIMES_PER_SEC = 400000;
-	REFERENCE_TIME hnsRequestedDuration = REFTIMES_PER_SEC;
-	REFERENCE_TIME hnsActualDuration;
+	REFERENCE_TIME hnsRequestedDuration = 1000000; // 100ms improves stability on high-latency devices (e.g. Bluetooth)
 	UINT32 bufferFrameCount;
 
 	IMMDeviceEnumerator* pEnumerator = nullptr;
@@ -29,15 +27,15 @@ bool AudioSource::setDevice(int index)
 	WAVEFORMATEX* pwfx = nullptr;
 	LPWSTR pwszID = nullptr;
 	IPropertyStore* pProps = nullptr;
-	bool isDefaultFormat = false;
 	WORD bitsPerSample = 0;
-
-	uint32_t freq = 1000;
+	DWORD streamFlagsEnhanced = 0;
+	size_t targetFramesPerChunk = 0;
+	size_t targetBufferSize = 0;
 
 	auto releaseLocal = [&]()
 	{
 		CoTaskMemFree(pwszID);
-		if (!isDefaultFormat) CoTaskMemFree(pwfx);
+		CoTaskMemFree(pwfx);
 		SAFE_RELEASE(pEnumerator);
 		SAFE_RELEASE(pCollection);
 		SAFE_RELEASE(pDevice);
@@ -55,6 +53,9 @@ bool AudioSource::setDevice(int index)
 
 	m_buffers[0].clear();
 	m_buffers[1].clear();
+	m_readyBuffers.clear();
+	m_isReady = false;
+	m_previewIndex = 0;
 
 	releaseAll();
 
@@ -69,12 +70,15 @@ bool AudioSource::setDevice(int index)
 	UINT count;
 	hr = pCollection->GetCount(&count);
 	FAIL_EXIT(hr);
-	if (index >= count) goto EXIT;
+	if (count == 0) goto EXIT;
+	if (index < 0 || static_cast<UINT>(index) >= count) {
+		index = 0;
+	}
 
 	hr = pCollection->Item(index, &pDevice);
 	if (FAILED(hr))
 	{
-		releaseAll();
+		SAFE_RELEASE(pDevice);
 		hr = pEnumerator->GetDefaultAudioEndpoint(m_eDataFlow, eConsole, &pDevice);
 		FAIL_EXIT(hr);
 	}
@@ -85,33 +89,20 @@ bool AudioSource::setDevice(int index)
 	hr = pAudioClient->GetMixFormat(&pwfx);
 	FAIL_EXIT(hr);
 
-	WAVEFORMATEXTENSIBLE preferredFormat;
-	ZeroMemory(&preferredFormat, sizeof(WAVEFORMATEXTENSIBLE));
-	preferredFormat.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
-	preferredFormat.Format.nChannels = 2;
-	preferredFormat.Format.nSamplesPerSec = 48000;
-	preferredFormat.Format.wBitsPerSample = 32;
-	preferredFormat.Format.nBlockAlign = (preferredFormat.Format.nChannels * preferredFormat.Format.wBitsPerSample) / 8;
-	preferredFormat.Format.nAvgBytesPerSec = preferredFormat.Format.nSamplesPerSec * preferredFormat.Format.nBlockAlign;
-	preferredFormat.Format.cbSize = 22;
-	preferredFormat.SubFormat = KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
-	preferredFormat.Samples.wValidBitsPerSample = 32;
-	preferredFormat.dwChannelMask = KSAUDIO_SPEAKER_STEREO;
+	streamFlagsEnhanced =
+		m_streamFlags |
+		AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM |
+		AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
 
 	hr = pAudioClient->Initialize(
 		AUDCLNT_SHAREMODE_SHARED,
-		m_streamFlags,
+		streamFlagsEnhanced,
 		hnsRequestedDuration,
 		0,
-		&preferredFormat.Format,
+		pwfx,
 		NULL);
 
-	if (SUCCEEDED(hr)) {
-		CoTaskMemFree(pwfx);
-		pwfx = &preferredFormat.Format;
-		isDefaultFormat = true;
-	}
-	else {
+	if (FAILED(hr)) {
 		hr = pAudioClient->Initialize(
 			AUDCLNT_SHAREMODE_SHARED,
 			m_streamFlags,
@@ -123,8 +114,7 @@ bool AudioSource::setDevice(int index)
 
 	FAIL_EXIT(hr);
 
-	freq = (uint32_t)pwfx->nSamplesPerSec;
-	setFrequency((uint32_t) pwfx->nSamplesPerSec);
+	setFrequency((uint32_t)pwfx->nSamplesPerSec);
 
 	// Cache source format so capture path can decode correctly.
 	m_sourceChannels = pwfx->nChannels > 0 ? pwfx->nChannels : 1;
@@ -141,11 +131,15 @@ bool AudioSource::setDevice(int index)
 			m_bytesPerSample = 4;
 		}
 		else if (ext->SubFormat == KSDATAFORMAT_SUBTYPE_PCM) {
-			if (bitsPerSample == 16) {
+			if (pwfx->wBitsPerSample == 16) {
 				m_sampleFormat = SampleFormat::Int16;
 				m_bytesPerSample = 2;
 			}
-			else if (bitsPerSample == 32) {
+			else if (pwfx->wBitsPerSample == 24) {
+				m_sampleFormat = SampleFormat::Int24;
+				m_bytesPerSample = 3;
+			}
+			else if (pwfx->wBitsPerSample == 32) {
 				m_sampleFormat = SampleFormat::Int32;
 				m_bytesPerSample = 4;
 			}
@@ -156,11 +150,15 @@ bool AudioSource::setDevice(int index)
 		m_bytesPerSample = 4;
 	}
 	else if (pwfx->wFormatTag == WAVE_FORMAT_PCM) {
-		if (bitsPerSample == 16) {
+		if (bitsPerSample == 16 || pwfx->wBitsPerSample == 16) {
 			m_sampleFormat = SampleFormat::Int16;
 			m_bytesPerSample = 2;
 		}
-		else if (bitsPerSample == 32) {
+		else if (bitsPerSample == 24 || pwfx->wBitsPerSample == 24) {
+			m_sampleFormat = SampleFormat::Int24;
+			m_bytesPerSample = 3;
+		}
+		else if (bitsPerSample == 32 || pwfx->wBitsPerSample == 32) {
 			m_sampleFormat = SampleFormat::Int32;
 			m_bytesPerSample = 4;
 		}
@@ -177,16 +175,25 @@ bool AudioSource::setDevice(int index)
 	hr = pAudioClient->GetService(IID_IAudioCaptureClient, (void**)&m_pCaptureClient);
 	FAIL_EXIT(hr);
 
-	// Calculates the actual duration of the allocated buffer.
-	hnsActualDuration = (double)REFTIMES_PER_SEC * bufferFrameCount / pwfx->nSamplesPerSec;
-
 	// Starts recording.
 	hr = pAudioClient->Start();
 	FAIL_EXIT(hr);
 
-	m_maxBufferSize = AUDIOSRC_SAMPLES_PER_BUFFER * m_outputChannels;
+	// Use smaller source-rate chunks (~10ms) to reduce burstiness and latency.
+	targetFramesPerChunk = static_cast<size_t>(pwfx->nSamplesPerSec / 100);
+	targetFramesPerChunk = (std::max)(targetFramesPerChunk, static_cast<size_t>(bufferFrameCount / 4));
+	if (targetFramesPerChunk < 80) {
+		targetFramesPerChunk = 80;
+	}
+	targetBufferSize = targetFramesPerChunk * m_outputChannels;
+	m_maxBufferSize = targetBufferSize;
 
-	currentDevice = m_devices[index];
+	if (index >= 0 && static_cast<size_t>(index) < m_devices.size()) {
+		currentDevice = m_devices[index];
+	}
+	else {
+		currentDevice.index = static_cast<size_t>(index);
+	}
 
 	releaseLocal();
 
@@ -217,8 +224,12 @@ void AudioSource::captureAudio()
 	DWORD flags;
 
 	if (m_pCaptureClient == NULL) {
+		int fallbackIndex = 0;
+		if (!m_devices.empty() && currentDevice.index < m_devices.size()) {
+			fallbackIndex = static_cast<int>(currentDevice.index);
+		}
 		m_mutex.unlock();
-		setDevice();
+		setDevice(fallbackIndex);
 		return;
 	}
 
@@ -255,6 +266,17 @@ void AudioSource::captureAudio()
 			case SampleFormat::Int16:
 				sampleF = static_cast<float>(*reinterpret_cast<const int16_t*>(samplePtr)) / 32768.0f;
 				break;
+			case SampleFormat::Int24: {
+				int32_t sampleI =
+					(static_cast<int32_t>(samplePtr[0]) & 0xFF) |
+					((static_cast<int32_t>(samplePtr[1]) & 0xFF) << 8) |
+					((static_cast<int32_t>(samplePtr[2]) & 0xFF) << 16);
+				if ((sampleI & 0x800000) != 0) {
+					sampleI |= ~0xFFFFFF;
+				}
+				sampleF = static_cast<float>(sampleI) / 8388608.0f;
+				break;
+			}
 			case SampleFormat::Int32:
 				sampleF = static_cast<float>(*reinterpret_cast<const int32_t*>(samplePtr)) / 2147483648.0f;
 				break;
@@ -275,7 +297,12 @@ void AudioSource::captureAudio()
 			}
 
 			if (m_buffers[m_activeBuffer].size() + 2 > m_maxBufferSize) {
+				const int completedBuffer = m_activeBuffer;
 				swapBuffers();
+				if (m_readyBuffers.size() >= m_maxReadyBuffers) {
+					m_readyBuffers.pop_front();
+				}
+				m_readyBuffers.push_back(m_buffers[completedBuffer]);
 				m_buffers[m_activeBuffer].clear();
 				m_isReady = true;
 			}
@@ -331,32 +358,34 @@ EXIT:
 
 bool AudioSource::isReady()
 {
-	return m_isReady;
+	std::lock_guard<std::mutex> guard(m_mutex);
+	return !m_readyBuffers.empty();
 }
 
 const std::vector<int16_t> AudioSource::popBuffer()
 {
-	if (!m_isReady)
-	{
+	std::lock_guard<std::mutex> guard(m_mutex);
+	if (m_readyBuffers.empty()) {
+		m_isReady = false;
 		return std::vector<int16_t>();
 	}
 
-	m_isReady = false;
-	return std::vector<int16_t>(m_buffers[1 - m_activeBuffer]);
+	std::vector<int16_t> out = std::move(m_readyBuffers.front());
+	m_readyBuffers.pop_front();
+	m_isReady = !m_readyBuffers.empty();
+	return out;
 }
 
 const int AudioSource::popPreviewDecibel()
 {
-	int inactiveBuffer;
-	inactiveBuffer = 1 - m_activeBuffer;
-
-	if (m_previewIndex >= 0 && m_previewIndex < m_buffers[inactiveBuffer].size())
-	{
-		int decibelValue;
-		decibelValue = AudioTools::previewDecibel(isEnabled ? m_buffers[inactiveBuffer][m_previewIndex] : 0);
-		m_previewIndex++;
-
-		return decibelValue;
+	std::lock_guard<std::mutex> guard(m_mutex);
+	if (!m_readyBuffers.empty()) {
+		const std::vector<int16_t>& previewBuffer = m_readyBuffers.back();
+		if (m_previewIndex >= 0 && static_cast<size_t>(m_previewIndex) < previewBuffer.size()) {
+			int decibelValue = AudioTools::previewDecibel(isEnabled ? previewBuffer[m_previewIndex] : 0);
+			m_previewIndex++;
+			return decibelValue;
+		}
 	}
 
 	return AUDIOTOOLS_PREVIEW_MIN_DB;

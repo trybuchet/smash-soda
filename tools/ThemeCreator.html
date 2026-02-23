@@ -85,11 +85,46 @@
     }
 
     .form-group input[type="color"] {
-      border: solid 1px transparent;
-      outline: none;
-      width: 32px;
-      height: 32px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      padding: 0;
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      border: solid 2px rgba(255, 255, 255, 0.25);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
       cursor: pointer;
+      transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+    }
+
+    .form-group input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+      border-radius: 999px;
+    }
+
+    .form-group input[type="color"]::-webkit-color-swatch {
+      border: none;
+      border-radius: 999px;
+    }
+
+    .form-group input[type="color"]::-moz-color-swatch {
+      border: none;
+      border-radius: 999px;
+    }
+
+    .form-group input[type="color"]:hover {
+      transform: translateY(-1px) scale(1.04);
+      border-color: rgba(255, 255, 255, 0.75);
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
+    }
+
+    .form-group input[type="color"]:focus-visible {
+      outline: none;
+      border-color: rgba(255, 255, 255, 0.95);
+      box-shadow:
+        0 0 0 2px rgba(176, 66, 41, 0.45),
+        0 0 0 4px rgba(255, 255, 255, 0.2);
     }
 
     .preview {
@@ -274,7 +309,7 @@
     <div class="app-sidebar">
         <form id="themeForm"></form>
         <div class="app-options">
-            <button id="save">Save</button>
+            <button id="save" type="button">Save</button>
         </div>
     </div>
     <div class="preview background">
@@ -412,63 +447,103 @@
   </div>
 
   <script>
-    // === Default color set ===
+    // === Default color set (Ember control scheme) ===
     const colors = {
-      panelBackground: "#302E2B",
+      panelBackground: "#302E2BFF",
       panelBorder: "#FFFFFF33",
-      panelBorderActive: "#B04229",
-      panelText: "#F2EEDD",
-      panelTitleBar: "#F2EEDD",
-      panelTitleBarText: "#302E2B",
-      panelTitleBarActive: "#B04229",
-      panelTitleBarActiveText: "#FFFFFF",
-      panelFooter: "#282623",
-      panelFooterText: "#B3B3B3",
+      panelBorderActive: "#B04229FF",
+      panelText: "#F2EEDDFF",
+      panelTitleBar: "#F2EEDDFF",
+      panelTitleBarText: "#302E2BFF",
+      panelTitleBarActive: "#B04229FF",
+      panelTitleBarActiveText: "#FFFFFFFF",
+      panelFooter: "#282623FF",
+      panelFooterText: "#B3B3B3FF",
 
-      groupBackground: "#302E2B",
+      text: "#F2EEDDFF",
+      textMuted: "#B3B3B3FF",
+      textHighlighted: "#E8CC40FF",
+      positive: "#8CBF8CFF",
+      negative: "#CC7373FF",
+      warning: "#E8CC40FF",
+      listItemBackground: "#353330FF",
 
-      tabsBackground: "#282623",
-      tabsBorder: "#B04229",
-      tab: "#F2EEDD",
-      tabText: "#302E2B",
-      tabHovered: "#B5472E",
-      tabActive: "#B04229",
-      tabActiveText: "#FFFFFF",
+      tabsBackground: "#282623FF",
+      tabsBorder: "#B04229FF",
+      tab: "#F2EEDDFF",
+      tabText: "#302E2BFF",
+      tabHovered: "#B5472EFF",
+      tabActive: "#B04229FF",
+      tabActiveText: "#FFFFFFFF",
 
-      navbarBackground: "#302E2B",
+      navbarBackground: "#302E2BFF",
       navbarBorder: "#FFFFFF33",
       navbarIcon: "#FFFFFF26",
-      navbarIconActive: "#C76554",
+      navbarIconActive: "#D45639FF",
+      backgroundIcon: "#FFFFFF26",
 
-      formLabel: "#F2EEDD",
-      formInputBackground: "#1A1A1A",
-      formInputBorder: "#262626",
-      formInputBorderActive: "#FFFFFF",
-      formInputText: "#B3B3B3",
-      formInputTextActive: "#FFFFFF",
-      formHelpText: "#E8CC40",
+      formLabel: "#E8A540FF",
+      formInputBackground: "#1A1A1AFF",
+      formInputBorder: "#262626FF",
+      formInputBorderActive: "#FFFFFFFF",
+      formInputText: "#B3B3B3FF",
+      formInputTextActive: "#FFFFFFFF",
+      formHelpText: "#F2EEDDFF",
 
-      buttonPrimary: "#B04229",
-      buttonPrimaryText: "#FFFFFF",
-      buttonPrimaryHovered: "#B5472E",
-      buttonPrimaryActive: "#B8482E",
-      buttonPrimaryDisabled: "#262626",
+      buttonPrimary: "#B04229FF",
+      buttonPrimaryBorder: "#B04229FF",
+      buttonPrimaryText: "#FFFFFFFF",
+      buttonPrimaryHovered: "#B5472EFF",
+      buttonPrimaryHoveredText: "#FFFFFFFF",
+      buttonPrimaryActive: "#B8482EFF",
+      buttonPrimaryActiveText: "#FFFFFFFF",
+      buttonPrimaryDisabled: "#262626FF",
 
-      buttonSecondary: "#F2EEDD",
+      buttonSecondary: "#F2EEDDFF",
+      buttonSecondaryBorder: "#00000033",
       buttonSecondaryText: "#302E2BFF",
-      buttonSecondaryHovered: "#FAF3D9",
-      buttonSecondaryActive: "#d4d4d4ff",
-      buttonSecondaryDisabled: "#262626",
+      buttonSecondaryHovered: "#FAF3D9FF",
+      buttonSecondaryHoveredText: "#302E2BFF",
+      buttonSecondaryActive: "#D4D4D4FF",
+      buttonSecondaryActiveText: "#FFFFFFFF",
+      buttonSecondaryDisabled: "#262626FF",
 
-      buttonEnable: "#B04229",
-      buttonDisable: "#262626",
+      buttonEnable: "#B04229FF",
+      buttonEnableBorder: "#B04229FF",
+      buttonEnableText: "#FFFFFFFF",
+      buttonEnableHovered: "#B5472EFF",
+      buttonEnableHoveredText: "#FFFFFFFF",
+      buttonEnableActive: "#B8482EFF",
+      buttonEnableActiveText: "#FFFFFFFF",
+      buttonEnableDisabled: "#262626FF",
 
-      scrollbarBackground: "#262626",
-      scrollbarHandle: "#B3B3B3",
-      scrollbarHandleHovered: "#B3B3B3",
-      scrollbarHandleActive: "#B3B3B3",
+      buttonDisable: "#262626FF",
+      buttonDisableBorder: "#262626FF",
+      buttonDisableText: "#FFFFFFFF",
+      buttonDisableHovered: "#262626FF",
+      buttonDisableHoveredText: "#FFFFFFFF",
+      buttonDisableActive: "#262626FF",
+      buttonDisableActiveText: "#FFFFFFFF",
+      buttonDisableDisabled: "#262626FF",
 
-      background: "#1E1C1AFF"
+      scrollbarBackground: "#262626FF",
+      scrollbarHandle: "#B3B3B3FF",
+      scrollbarHandleHovered: "#B3B3B3FF",
+      scrollbarHandleActive: "#B3B3B3FF",
+
+      sliderGrab: "#B04229FF",
+      sliderGrabActive: "#B8482EFF",
+
+      background: "#1E1C1AFF",
+      primary: "#F2EEDDFF",
+      secondary: "#F2EEDDFF",
+      disabled: "#0F0F0FFF",
+      invisible: "#FFFFFF00",
+      white: "#FFFFFFFF",
+      black: "#000000FF",
+      title: "#FFFFFFFF",
+      label: "#E8A540FF",
+      input: "#B3B3B3FF"
     };
 
     const themeForm = document.getElementById("themeForm");
@@ -540,18 +615,18 @@
         .form-help-text { color: ${colors.formHelpText}; }
 
         /* === Buttons (Primary) === */
-        .button-primary { background-color: ${colors.buttonPrimary}; color: ${colors.buttonPrimaryText}; border-color: ${colors.buttonPrimary}; }
-        .button-primary-hovered { background-color: ${colors.buttonPrimaryHovered}; color: #FFFFFF; }
-        .button-primary-active { background-color: ${colors.buttonPrimaryActive}; color: #FFFFFF; }
+        .button-primary { background-color: ${colors.buttonPrimary}; color: ${colors.buttonPrimaryText}; border-color: ${colors.buttonPrimaryBorder}; }
+        .button-primary-hovered { background-color: ${colors.buttonPrimaryHovered}; color: ${colors.buttonPrimaryHoveredText}; }
+        .button-primary-active { background-color: ${colors.buttonPrimaryActive}; color: ${colors.buttonPrimaryActiveText}; }
         .button-primary-disabled { background-color: ${colors.buttonPrimaryDisabled}; }
 
         .button-primary:hover { background-color: ${colors.buttonPrimaryHovered}; border-color: ${colors.buttonPrimaryHovered}; }
         .button-primary:active { background-color: ${colors.buttonPrimaryActive}; border-color: ${colors.buttonPrimaryActive}; }
 
         /* === Buttons (Secondary) === */
-        .button-secondary { background-color: ${colors.buttonSecondary}; color: ${colors.buttonSecondaryText}; border-color: #00000033; }
-        .button-secondary-hovered { background-color: ${colors.buttonSecondaryHovered}; color: #302E2B; }
-        .button-secondary-active { background-color: ${colors.buttonSecondaryActive}; color: #FFFFFF; }
+        .button-secondary { background-color: ${colors.buttonSecondary}; color: ${colors.buttonSecondaryText}; border-color: ${colors.buttonSecondaryBorder}; }
+        .button-secondary-hovered { background-color: ${colors.buttonSecondaryHovered}; color: ${colors.buttonSecondaryHoveredText}; }
+        .button-secondary-active { background-color: ${colors.buttonSecondaryActive}; color: ${colors.buttonSecondaryActiveText}; }
         .button-secondary-disabled { background-color: ${colors.buttonSecondaryDisabled}; }
 
         .button-secondary:hover { background-color: ${colors.buttonSecondaryHovered}; border-color: ${colors.buttonSecondaryHovered}; }
@@ -603,7 +678,8 @@
     // Initialize theme on load
     updateTheme();
 
-    document.getElementById("save").addEventListener("click", () => {
+    document.getElementById("save").addEventListener("click", (event) => {
+        event.preventDefault();
         const themeName = prompt("Enter a name for your theme:");
         if (!themeName) return; 
         const themeData = { name: themeName, ...colors };

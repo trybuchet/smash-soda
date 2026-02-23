@@ -7,8 +7,10 @@ nav:
   - Home: index.md
   - Getting Started:
     - Installation: getting-started/install.md
+    - Manual Build (Windows): getting-started/manual-build.md
     - Overview: getting-started/overview.md
     - Quickstart: getting-started/quickstart.md
+    - Development and Contributing: getting-started/development.md
     - Migration: getting-started/migration.md
   - Widgets:
     - Audio: widgets/Audio.md

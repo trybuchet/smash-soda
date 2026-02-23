@@ -2,6 +2,8 @@
 
 #include <string>
 #include <thread>
+#include <atomic>
+#include <functional>
 #include "matoya.h"
 #include "../imgui/imgui.h"
 #include "../ImGui/imgui_markdown.h"
@@ -40,12 +42,16 @@ public:
 	ImGui::MarkdownConfig mdConfig;
 	
 	// Constructor
-	VersionWidget();
+	VersionWidget(function<void()> onSodaArcadeLogin = nullptr);
 
 	bool render();
 	bool renderLoginWindow();
 	bool renderUpdateWindow();
 	bool renderDownloadWindow();
+
+private:
+	function<void()> _onSodaArcadeLogin;
+	std::atomic<bool> _pendingSodaArcadeLoginRefresh = false;
 };
 
 

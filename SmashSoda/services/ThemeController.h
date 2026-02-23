@@ -30,6 +30,8 @@ public:
 
     void addTheme(std::unique_ptr<Theme> theme);
     void applyTheme(const std::string& name);
+    void setUiScale(float scale);
+    float getUiScale() const;
     Theme* getActiveTheme();
     std::vector<std::unique_ptr<Theme>>& getThemes();
     std::vector<std::pair<std::string, std::string>> getThemeNames();
@@ -41,4 +43,5 @@ private:
 
     std::vector<std::unique_ptr<Theme>> _themes;
     Theme* _activeTheme = nullptr;
+    float _uiScale = 1.0f;
 };

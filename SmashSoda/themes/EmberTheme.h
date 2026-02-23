@@ -33,8 +33,8 @@ public:
         tabActive = hexToImVec4("#B04229FF");
         tabActiveText = hexToImVec4("#FFFFFFFF");
 
-        navbarBackground = hexToImVec4("#0F0F0FFF");
-        navbarBorder = hexToImVec4("#262626FF");
+        navbarBackground = hexToImVec4("#302E2BFF");
+        navbarBorder = hexToImVec4("#FFFFFF33");
         navbarIcon = hexToImVec4("#FFFFFF26");
         navbarIconActive = hexToImVec4("#d45639ff");
 
