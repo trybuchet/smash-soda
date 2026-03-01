@@ -935,14 +935,14 @@ void Hosting::liveStreamMedia() {
 		return out;
 	};
 
-	auto drainSource = [&](AudioSource& source, std::deque<int16_t>& pending) {
+		auto drainSource = [&](AudioSource& source, std::deque<int16_t>& pending) {
 		while (source.isReady()) {
 			std::vector<int16_t> buffer = source.popBuffer();
 			if (buffer.empty()) {
 				continue;
 			}
 
-			appendPending(pending, AudioMix::resample(buffer, source.getFrequency(), SAFE_FREQUENCY));
+				appendPending(pending, AudioMix::resample(buffer, source.getFrequency(), SAFE_FREQUENCY, reinterpret_cast<uint64_t>(&source)));
 		}
 	};
 

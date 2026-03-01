@@ -38,8 +38,6 @@ void HotseatWidget::renderOverview() {
     ImVec2 size = ImGui::GetContentRegionAvail();
     Theme* theme = ThemeController::getInstance().getActiveTheme();
 
-    ImGui::Dummy(ImVec2(0, 5));
-
     if (Config::cfg.hotseat.enabled) {
 
         // Fill remaining tab body area without drawing an extra border.

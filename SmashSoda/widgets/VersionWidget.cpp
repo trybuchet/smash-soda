@@ -102,9 +102,13 @@ bool VersionWidget::render() {
 bool VersionWidget::renderLoginWindow() {
 
     Theme* theme = ThemeController::getInstance().getActiveTheme();
+    float uiScale = ThemeController::getInstance().getUiScale();
+    if (uiScale <= 0.0f) {
+        uiScale = 1.0f;
+    }
 
     static ImVec2 res;
-    size = ImVec2(400, 564);
+    size = ImVec2(400.0f * uiScale, 564.0f * uiScale);
 
     res = ImGui::GetMainViewport()->Size;
 
@@ -127,8 +131,8 @@ bool VersionWidget::renderLoginWindow() {
     startBody(true);
 
         // Center image
-	    ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.5f - 100);
-        ImGui::Image(AppIcons::sodaArcadeLogo, ImVec2(200, 46));
+	    ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.5f - (100.0f * uiScale));
+        ImGui::Image(AppIcons::sodaArcadeLogo, ImVec2(200.0f * uiScale, 46.0f * uiScale));
 
         // Text with wrap
         if (error.empty()) {
@@ -137,10 +141,10 @@ bool VersionWidget::renderLoginWindow() {
 			ImGui::PushStyleColor(ImGuiCol_Text, AppColors::negative);
 			ImGui::TextWrapped(error.c_str());
             ImGui::PopStyleColor();
-            ImGui::Dummy(ImVec2(0, 10));
+            ImGui::Dummy(ImVec2(0, 10.0f * uiScale));
 		}
 
-	    ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.5f - 112);
+        ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.5f - (112.0f * uiScale));
 
         if (elBtnSecondary("I don't want to use Soda Arcade")) {
 		    Config::cfg.arcade.showLogin = false;
@@ -148,7 +152,7 @@ bool VersionWidget::renderLoginWindow() {
 		    Config::cfg.Save();
         }
 
-	    ImGui::Dummy(ImVec2(0, 10));
+        ImGui::Dummy(ImVec2(0, 10.0f * uiScale));
 
         if (elText("E-Mail Address", _email, "The e-mail address you signed up to Soda Arcade with.")) {
 
@@ -191,17 +195,17 @@ bool VersionWidget::renderLoginWindow() {
 
             }
             ImGui::SameLine();
-            ImGui::Indent(65);
+            ImGui::Indent(65.0f * uiScale);
             if (elBtnSecondary("Create account")) {
                 const wchar_t* link = L"https://soda-arcade.com/register";
                 ShellExecute(0, 0, link, 0, 0, SW_SHOW);
             }
-            ImGui::Unindent(65);
+            ImGui::Unindent(65.0f * uiScale);
         } else {
             static ImVec2 cursor;
             cursor = ImGui::GetCursorPos();
-            cursor.x += 164;
-            cursor.y -= 10;
+            cursor.x += 164.0f * uiScale;
+            cursor.y -= 10.0f * uiScale;
             ImGui::SetCursorPos(cursor);
             LoadingRingWidget::render();
 		}
@@ -293,6 +297,9 @@ bool VersionWidget::renderUpdateWindow() {
     ImGui::PushFont(AppFonts::title);
     ImGui::PushStyleColor(ImGuiCol_Text, theme->panelText);
 
+    bool startUpdate = false;
+    static std::string updateError = "";
+
     static ImVec2 res;
     static ImVec2 size = ImVec2(400, 500);
 
@@ -304,9 +311,15 @@ bool VersionWidget::renderUpdateWindow() {
     ));
     ImGui::SetNextWindowSize(size);
     ImGui::SetNextWindowFocus();
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::Begin("Update Available###Update Window", (bool*)0, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse);
+    this->size = ImGui::GetContentRegionAvail();
+    pos = ImGui::GetWindowPos();
+    isTitleFocused = ImGui::IsWindowFocused();
+
+    startBody(true);
+
     ImGui::PushFont(AppFonts::input);
-    ImGui::PushStyleColor(ImGuiCol_Text, theme->formInputText);
 
     ImGui::PushFont(AppFonts::input);
     ImGui::PushStyleColor(ImGuiCol_Text, theme->positive);
@@ -326,20 +339,26 @@ bool VersionWidget::renderUpdateWindow() {
     ImGui::Spacing();
 	ImGui::Separator();
     ImGui::Spacing();
-    
 
     ImGui::Markdown(Cache::cache.update.notes.c_str(), Cache::cache.update.notes.length(), mdConfig);
 
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
+    if (!updateError.empty()) {
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+        ImGui::PushStyleColor(ImGuiCol_Text, AppColors::negative);
+        ImGui::TextWrapped("%s", updateError.c_str());
+        ImGui::PopStyleColor();
+    }
+
+    ImGui::PopFont();
+
+    endBody();
+
+    startFooter();
 
     AppColors::pushButtonSolid();
 
-    bool startUpdate = false;
-    static std::string updateError = "";
-
-    ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.5f - 45);
     if (elBtn("Update")) {
         updateError = "";
 
@@ -372,16 +391,18 @@ bool VersionWidget::renderUpdateWindow() {
         }
     }
 
-    if (!updateError.empty()) {
-        ImGui::Spacing();
-        ImGui::PushStyleColor(ImGuiCol_Text, AppColors::negative);
-        ImGui::TextWrapped("%s", updateError.c_str());
-        ImGui::PopStyleColor();
+    ImGui::SameLine(0.0f, 16.0f);
+    if (elBtnSecondary("Dismiss")) {
+        showUpdate = false;
+        updateError = "";
     }
 
-    ImGui::PopStyleColor();
-    ImGui::PopFont();
+    AppColors::popButton();
+
+    endFooter();
+
     ImGui::End();
+    ImGui::PopStyleVar();
     ImGui::PopStyleColor();
     ImGui::PopFont();
 

@@ -7,6 +7,7 @@
 #include <deque>
 #include <cstdint>
 #include <iostream>
+#include <atomic>
 #include <mutex>
 #include <functiondiscoverykeys.h>
 #include <Audioclient.h>
@@ -57,6 +58,7 @@ public:
 	void captureAudio();
 	const vector<int16_t> popBuffer();
 	const int popPreviewDecibel();
+	const int peekPreviewDecibel();
 	const float* getPlot();
 	const void togglePlot(const bool enabled);
 
@@ -98,9 +100,10 @@ protected:
 	int m_previewIndex = 0;
 	bool m_isPlotActive = false;
 	float m_plotBuffer[AUDIOSRC_SAMPLES_PER_BUFFER];
+	std::atomic<int16_t> m_lastPreviewSample{ 0 };
 
 	size_t m_maxBufferSize = 0;
-	size_t m_maxReadyBuffers = 24;
+	size_t m_maxReadyBuffers = 64;
 
 
 	uint32_t m_frequency = 48000;  // Default to 48kHz (Parsec's preferred rate)

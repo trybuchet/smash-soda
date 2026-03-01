@@ -38,21 +38,30 @@ void GuestListWidget::guestItem(Guest& guest) {
 void GuestListWidget::renderOnlineGuests() {
 
     Theme* theme = ThemeController::getInstance().getActiveTheme();
+    float uiScale = ThemeController::getInstance().getUiScale();
+    if (uiScale <= 0.0f) {
+        uiScale = 1.0f;
+    }
+    const float filterIndent = 20.0f * uiScale;
+    const float filterTopPad = 10.0f * uiScale;
+    const float filterBarHeight = 81.0f * uiScale;
+    const float filterRounding = 8.0f * uiScale;
+    const float filterBorderThickness = 1.0f * uiScale;
 
-    ImGui::Unindent(20);
-    ImGui::BeginChild("filterbar", ImVec2(size.x, 81));
+    ImGui::Unindent(filterIndent);
+    ImGui::BeginChild("filterbar", ImVec2(size.x, filterBarHeight));
     ImGui::SetCursorPos(ImVec2(0, 0));
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         pos = ImGui::GetCursorScreenPos();
-        ImGui::Dummy(ImVec2(0, 10));
-        drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + 84), ImGui::ColorConvertFloat4ToU32(ImVec4(0,0,0,0.1)), 8, ImDrawFlags_RoundCornersBottom);
-        ImGui::Indent(20);
+        drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + filterBarHeight), ImGui::ColorConvertFloat4ToU32(ImVec4(0,0,0,0.1)), filterRounding, ImDrawFlags_RoundCornersBottom);
+        drawList->AddLine(ImVec2(pos.x, pos.y + filterBarHeight), ImVec2(pos.x + size.x, pos.y + filterBarHeight), ImGui::ColorConvertFloat4ToU32(theme->panelBorder), filterBorderThickness);
+        ImGui::Dummy(ImVec2(0, filterTopPad));
+        ImGui::Indent(filterIndent);
         elText("", _filterText, "Filter by name or ID");
-        ImGui::Unindent(20);
+        ImGui::Unindent(filterIndent);
     ImGui::EndChild();
-    ImGui::SetCursorPos(ImVec2(0, 148));
-    ImGui::Separator();
-    ImGui::Indent(20);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
+    ImGui::Indent(filterIndent);
 
     size = ImGui::GetContentRegionAvail();
     static size_t popupIndex;
@@ -278,20 +287,32 @@ void GuestListWidget::renderOnlineGuests() {
 
 void GuestListWidget::renderBannedGuests() {
 
-    ImGui::Unindent(20);
-    ImGui::BeginChild("filterbar", ImVec2(size.x, 81));
+    Theme* theme = ThemeController::getInstance().getActiveTheme();
+
+    float uiScale = ThemeController::getInstance().getUiScale();
+    if (uiScale <= 0.0f) {
+        uiScale = 1.0f;
+    }
+    const float filterIndent = 20.0f * uiScale;
+    const float filterTopPad = 10.0f * uiScale;
+    const float filterBarHeight = 81.0f * uiScale;
+    const float filterRounding = 8.0f * uiScale;
+    const float filterBorderThickness = 1.0f * uiScale;
+
+    ImGui::Unindent(filterIndent);
+    ImGui::BeginChild("filterbar", ImVec2(size.x, filterBarHeight));
     ImGui::SetCursorPos(ImVec2(0, 0));
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     pos = ImGui::GetCursorScreenPos();
-    ImGui::Dummy(ImVec2(0, 10));
-    drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + 84), ImGui::ColorConvertFloat4ToU32(ImVec4(0, 0, 0, 0.1)), 8);
-    ImGui::Indent(20);
+    drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + filterBarHeight), ImGui::ColorConvertFloat4ToU32(ImVec4(0, 0, 0, 0.1)), filterRounding, ImDrawFlags_RoundCornersBottom);
+    drawList->AddLine(ImVec2(pos.x, pos.y + filterBarHeight), ImVec2(pos.x + size.x, pos.y + filterBarHeight), ImGui::ColorConvertFloat4ToU32(theme->panelBorder), filterBorderThickness);
+    ImGui::Dummy(ImVec2(0, filterTopPad));
+    ImGui::Indent(filterIndent);
     elText("", _filterText, "Filter by name or ID");
-    ImGui::Unindent(20);
+    ImGui::Unindent(filterIndent);
     ImGui::EndChild();
-    ImGui::SetCursorPos(ImVec2(0, 148));
-    ImGui::Separator();
-    ImGui::Indent(20);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
+    ImGui::Indent(filterIndent);
 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1));
     ImGui::BeginChild("bannedlist");
@@ -398,20 +419,32 @@ void GuestListWidget::renderBannedGuests() {
 
 void GuestListWidget::renderHistoryGuests() {
 
-    ImGui::Unindent(20);
-    ImGui::BeginChild("filterbar", ImVec2(size.x, 81));
+    Theme* theme = ThemeController::getInstance().getActiveTheme();
+
+    float uiScale = ThemeController::getInstance().getUiScale();
+    if (uiScale <= 0.0f) {
+        uiScale = 1.0f;
+    }
+    const float filterIndent = 20.0f * uiScale;
+    const float filterTopPad = 10.0f * uiScale;
+    const float filterBarHeight = 81.0f * uiScale;
+    const float filterRounding = 8.0f * uiScale;
+    const float filterBorderThickness = 1.0f * uiScale;
+
+    ImGui::Unindent(filterIndent);
+    ImGui::BeginChild("filterbar", ImVec2(size.x, filterBarHeight));
     ImGui::SetCursorPos(ImVec2(0, 0));
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     pos = ImGui::GetCursorScreenPos();
-    ImGui::Dummy(ImVec2(0, 10));
-    drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + 84), ImGui::ColorConvertFloat4ToU32(ImVec4(0, 0, 0, 0.1)), 8, ImDrawFlags_RoundCornersBottom);
-    ImGui::Indent(20);
+    drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + filterBarHeight), ImGui::ColorConvertFloat4ToU32(ImVec4(0, 0, 0, 0.1)), filterRounding, ImDrawFlags_RoundCornersBottom);
+    drawList->AddLine(ImVec2(pos.x, pos.y + filterBarHeight), ImVec2(pos.x + size.x, pos.y + filterBarHeight), ImGui::ColorConvertFloat4ToU32(theme->panelBorder), filterBorderThickness);
+    ImGui::Dummy(ImVec2(0, filterTopPad));
+    ImGui::Indent(filterIndent);
     elText("", _filterText, "Filter by name or ID");
-    ImGui::Unindent(20);
+    ImGui::Unindent(filterIndent);
     ImGui::EndChild();
-    ImGui::SetCursorPos(ImVec2(0, 148));
-    ImGui::Separator();
-    ImGui::Indent(20);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
+    ImGui::Indent(filterIndent);
 
     ImGui::BeginChild("historylist");
     static bool showBanPopup = false;
@@ -487,20 +520,32 @@ void GuestListWidget::renderHistoryGuests() {
 
 void GuestListWidget::renderModdedGuests() {
 
-    ImGui::Unindent(20);
-    ImGui::BeginChild("filterbar", ImVec2(size.x, 81));
+    Theme* theme = ThemeController::getInstance().getActiveTheme();
+
+    float uiScale = ThemeController::getInstance().getUiScale();
+    if (uiScale <= 0.0f) {
+        uiScale = 1.0f;
+    }
+    const float filterIndent = 20.0f * uiScale;
+    const float filterTopPad = 10.0f * uiScale;
+    const float filterBarHeight = 81.0f * uiScale;
+    const float filterRounding = 8.0f * uiScale;
+    const float filterBorderThickness = 1.0f * uiScale;
+
+    ImGui::Unindent(filterIndent);
+    ImGui::BeginChild("filterbar", ImVec2(size.x, filterBarHeight));
     ImGui::SetCursorPos(ImVec2(0, 0));
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     pos = ImGui::GetCursorScreenPos();
-    ImGui::Dummy(ImVec2(0, 10));
-    drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + 84), ImGui::ColorConvertFloat4ToU32(ImVec4(0, 0, 0, 0.1)), 8, ImDrawFlags_RoundCornersBottom);
-    ImGui::Indent(20);
+    drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + filterBarHeight), ImGui::ColorConvertFloat4ToU32(ImVec4(0, 0, 0, 0.1)), filterRounding, ImDrawFlags_RoundCornersBottom);
+    drawList->AddLine(ImVec2(pos.x, pos.y + filterBarHeight), ImVec2(pos.x + size.x, pos.y + filterBarHeight), ImGui::ColorConvertFloat4ToU32(theme->panelBorder), filterBorderThickness);
+    ImGui::Dummy(ImVec2(0, filterTopPad));
+    ImGui::Indent(filterIndent);
     elText("", _filterText, "Filter by name or ID");
-    ImGui::Unindent(20);
+    ImGui::Unindent(filterIndent);
     ImGui::EndChild();
-    ImGui::SetCursorPos(ImVec2(0, 148));
-    ImGui::Separator();
-    ImGui::Indent(20);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
+    ImGui::Indent(filterIndent);
 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1));
     ImGui::BeginChild("moddedlist");
@@ -592,20 +637,32 @@ void GuestListWidget::renderModdedGuests() {
 
 void GuestListWidget::renderVIPGuests() {
 
-    ImGui::Unindent(20);
-    ImGui::BeginChild("filterbar", ImVec2(size.x, 81));
+    Theme* theme = ThemeController::getInstance().getActiveTheme();
+
+    float uiScale = ThemeController::getInstance().getUiScale();
+    if (uiScale <= 0.0f) {
+        uiScale = 1.0f;
+    }
+    const float filterIndent = 20.0f * uiScale;
+    const float filterTopPad = 10.0f * uiScale;
+    const float filterBarHeight = 81.0f * uiScale;
+    const float filterRounding = 8.0f * uiScale;
+    const float filterBorderThickness = 1.0f * uiScale;
+
+    ImGui::Unindent(filterIndent);
+    ImGui::BeginChild("filterbar", ImVec2(size.x, filterBarHeight));
     ImGui::SetCursorPos(ImVec2(0, 0));
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     pos = ImGui::GetCursorScreenPos();
-    ImGui::Dummy(ImVec2(0, 10));
-    drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + 84), ImGui::ColorConvertFloat4ToU32(ImVec4(0, 0, 0, 0.1)), 8, ImDrawFlags_RoundCornersBottom);
-    ImGui::Indent(20);
+    drawList->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + filterBarHeight), ImGui::ColorConvertFloat4ToU32(ImVec4(0, 0, 0, 0.1)), filterRounding, ImDrawFlags_RoundCornersBottom);
+    drawList->AddLine(ImVec2(pos.x, pos.y + filterBarHeight), ImVec2(pos.x + size.x, pos.y + filterBarHeight), ImGui::ColorConvertFloat4ToU32(theme->panelBorder), filterBorderThickness);
+    ImGui::Dummy(ImVec2(0, filterTopPad));
+    ImGui::Indent(filterIndent);
     elText("", _filterText, "Filter by name or ID");
-    ImGui::Unindent(20);
+    ImGui::Unindent(filterIndent);
     ImGui::EndChild();
-    ImGui::SetCursorPos(ImVec2(0, 148));
-    ImGui::Separator();
-    ImGui::Indent(20);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
+    ImGui::Indent(filterIndent);
 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1));
     ImGui::BeginChild("viplist");

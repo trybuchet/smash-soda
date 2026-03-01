@@ -1,5 +1,7 @@
 ﻿#include "AudioSource.h"
 #include "helpers/WStringConvert.h"
+#include <algorithm>
+#include <utility>
 
 // ==================================================
 //   Constants
@@ -185,8 +187,13 @@ bool AudioSource::setDevice(int index)
 	if (targetFramesPerChunk < 80) {
 		targetFramesPerChunk = 80;
 	}
+	// Cap overly large chunks to keep latency reasonable on high-latency endpoints.
+	targetFramesPerChunk = (std::min)(targetFramesPerChunk, static_cast<size_t>(pwfx->nSamplesPerSec / 5)); // ~200ms upper bound
+
 	targetBufferSize = targetFramesPerChunk * m_outputChannels;
 	m_maxBufferSize = targetBufferSize;
+	m_buffers[0].reserve(m_maxBufferSize + m_outputChannels * 2);
+	m_buffers[1].reserve(m_maxBufferSize + m_outputChannels * 2);
 
 	if (index >= 0 && static_cast<size_t>(index) < m_devices.size()) {
 		currentDevice = m_devices[index];
@@ -296,13 +303,17 @@ void AudioSource::captureAudio()
 				right = 0;
 			}
 
+			// Track latest sample for UI meters even when buffers are consumed elsewhere.
+			m_lastPreviewSample.store(static_cast<int16_t>((left + right) / 2), std::memory_order_relaxed);
+
 			if (m_buffers[m_activeBuffer].size() + 2 > m_maxBufferSize) {
 				const int completedBuffer = m_activeBuffer;
 				swapBuffers();
-				if (m_readyBuffers.size() >= m_maxReadyBuffers) {
+				while (m_readyBuffers.size() >= m_maxReadyBuffers) {
 					m_readyBuffers.pop_front();
 				}
-				m_readyBuffers.push_back(m_buffers[completedBuffer]);
+				m_readyBuffers.push_back(std::move(m_buffers[completedBuffer]));
+				m_buffers[completedBuffer].clear();
 				m_buffers[m_activeBuffer].clear();
 				m_isReady = true;
 			}
@@ -388,7 +399,14 @@ const int AudioSource::popPreviewDecibel()
 		}
 	}
 
-	return AUDIOTOOLS_PREVIEW_MIN_DB;
+	// Fallback to most recent sample when buffers are being drained elsewhere (e.g., hosting).
+	return AudioTools::previewDecibel(isEnabled ? m_lastPreviewSample.load(std::memory_order_relaxed) : 0);
+}
+
+const int AudioSource::peekPreviewDecibel()
+{
+	// Non-destructive peek used by UI meters while hosting drains buffers elsewhere.
+	return AudioTools::previewDecibel(isEnabled ? m_lastPreviewSample.load(std::memory_order_relaxed) : 0);
 }
 
 const float* AudioSource::getPlot()

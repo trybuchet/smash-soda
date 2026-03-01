@@ -6,11 +6,16 @@ bool AlertWidget::render(const char * title, const char* message) {
     static bool result;
     result = false;
 
-    static ImVec2 BUTTON_SIZE = ImVec2(64, 64);
     static ImVec2 res;
     static ImVec2 cursor;
 
-    ImVec2 windowSize(400, 180);
+    float uiScale = ThemeController::getInstance().getUiScale();
+    if (uiScale <= 0.0f) {
+        uiScale = 1.0f;
+    }
+
+    const ImVec2 windowSize(400.0f * uiScale, 180.0f * uiScale);
+    const float contentPad = 10.0f * uiScale;
     res = ImGui::GetMainViewport()->Size;
 
     ImGui::SetNextWindowSize(windowSize);
@@ -32,10 +37,11 @@ bool AlertWidget::render(const char * title, const char* message) {
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoResize))
     {
-        ImVec2 size = ImGui::GetContentRegionAvail();
+        const ImVec2 contentMax = ImGui::GetWindowContentRegionMax();
+        const ImGuiStyle& style = ImGui::GetStyle();
 
         cursor = ImGui::GetCursorPos();
-        ImGui::SetCursorPos(ImVec2(cursor.x + 10, cursor.y + 10));
+        ImGui::SetCursorPos(ImVec2(cursor.x + contentPad, cursor.y + contentPad));
 
         ImGui::PushFont(AppFonts::input);
         ImGui::PushStyleColor(ImGuiCol_Text, theme->formInputText);
@@ -43,7 +49,12 @@ bool AlertWidget::render(const char * title, const char* message) {
         ImGui::PopStyleColor();
         ImGui::PopFont();
 
-        ImGui::SetCursorPos(ImVec2(size.x - 54, size.y));
+        const float buttonWidth = ImGui::CalcTextSize("Okay").x + (style.FramePadding.x * 2.0f);
+        const float buttonHeight = ImGui::GetFrameHeight();
+        const float buttonX = contentMax.x - buttonWidth - contentPad;
+        const float buttonY = contentMax.y - buttonHeight - contentPad;
+
+        ImGui::SetCursorPos(ImVec2(buttonX, buttonY));
 
         if (Widget::elBtn("Okay")) {
             result = true;

@@ -59,7 +59,8 @@ bool AudioSettingsWidget::render(bool& showWindow)
     static int micVolume;
     static float micPreview, targetPreview;
     micVolume = (int)(100.0f * _audioIn.volume);
-    targetPreview = AudioTools::decibelToFloat(_audioIn.popPreviewDecibel());
+    const int micDb = _hosting.isRunning() ? _audioIn.peekPreviewDecibel() : _audioIn.popPreviewDecibel();
+    targetPreview = AudioTools::decibelToFloat(micDb);
     micPreview = lerp(micPreview, targetPreview, easing(targetPreview - micPreview));
     if (AudioControlWidget::render("Microphone##Audio In", &micVolume, _audioIn.isEnabled, micPreview, AppIcons::micOn, AppIcons::micOff))
     {
@@ -115,7 +116,8 @@ bool AudioSettingsWidget::render(bool& showWindow)
     static int speakersVolume;
     static float speakersPreview;
     speakersVolume = (int)(100.0f *_audioOut.volume);
-    targetPreview = AudioTools::decibelToFloat(_audioOut.popPreviewDecibel());
+    const int outDb = _hosting.isRunning() ? _audioOut.peekPreviewDecibel() : _audioOut.popPreviewDecibel();
+    targetPreview = AudioTools::decibelToFloat(outDb);
     speakersPreview = lerp(speakersPreview, targetPreview, easing(targetPreview - speakersPreview));
     if (AudioControlWidget::render("Speakers##Audio Out", &speakersVolume, _audioOut.isEnabled, speakersPreview, AppIcons::speakersOn, AppIcons::speakersOff))
     {

@@ -1,8 +1,11 @@
 ﻿#include "AudioMix.h"
+#include <cmath>
+#include <unordered_map>
 
 const std::vector<int16_t>& AudioMix::mix(const std::vector<int16_t>& buffer1, const std::vector<int16_t>& buffer2)
 {
-	static std::vector<int16_t> mixBuffer;
+	// Thread-local to avoid cross-thread clobbering when multiple mixes happen concurrently.
+	thread_local std::vector<int16_t> mixBuffer;
 	constexpr float INV_INT16 = 1.0f / 32768.0f;
 	constexpr float MIC_MIX_GAIN = 0.45f;
 	constexpr float SPEAKER_MIX_GAIN = 1.0f;
@@ -49,7 +52,7 @@ const std::vector<int16_t>& AudioMix::mix(const std::vector<int16_t>& buffer1, c
 	return mixBuffer;
 }
 
-std::vector<int16_t> AudioMix::resample(const std::vector<int16_t>& buffer, uint32_t srcRate, uint32_t dstRate)
+std::vector<int16_t> AudioMix::resample(const std::vector<int16_t>& buffer, uint32_t srcRate, uint32_t dstRate, uint64_t streamKey)
 {
 	// No resampling needed if rates match or buffer is empty
 	if (srcRate == dstRate || buffer.empty() || srcRate == 0 || dstRate == 0) {
@@ -69,31 +72,61 @@ std::vector<int16_t> AudioMix::resample(const std::vector<int16_t>& buffer, uint
 	}
 
 	std::vector<int16_t> result(dstFrames * 2);
-	
-	double ratio = (double)srcRate / dstRate;
-	
+
+	struct ResampleState {
+		double carry = 0.0;
+		uint32_t src = 0;
+		uint32_t dst = 0;
+	};
+
+	static thread_local std::unordered_map<uint64_t, ResampleState> states;
+	const uint64_t stateKey = streamKey ^ (static_cast<uint64_t>(srcRate) << 32) ^ static_cast<uint64_t>(dstRate);
+	ResampleState& st = states[stateKey];
+
+	if (st.src != srcRate || st.dst != dstRate) {
+		st.carry = 0.0;
+		st.src = srcRate;
+		st.dst = dstRate;
+	}
+
+	const double step = static_cast<double>(srcRate) / static_cast<double>(dstRate);
+	double srcCursor = st.carry;
+
 	for (size_t i = 0; i < dstFrames; i++) {
-		double srcPos = i * ratio;
-		size_t srcIndex = (size_t)srcPos;
-		double frac = srcPos - srcIndex;
-		
+		size_t srcIndex = static_cast<size_t>(srcCursor);
+		double frac = srcCursor - static_cast<double>(srcIndex);
+
 		// Clamp to valid range.
 		if (srcIndex >= srcFrames) {
 			srcIndex = srcFrames - 1;
 			frac = 0.0;
 		}
 		const size_t nextIndex = (srcIndex + 1 < srcFrames) ? (srcIndex + 1) : srcIndex;
-		
+
 		// Linear interpolation for left channel
-		int16_t left1 = buffer[srcIndex * 2];
-		int16_t left2 = buffer[nextIndex * 2];
-		result[i * 2] = (int16_t)(left1 + frac * (left2 - left1));
-		
+		const int16_t left1 = buffer[srcIndex * 2];
+		const int16_t left2 = buffer[nextIndex * 2];
+		result[i * 2] = static_cast<int16_t>(left1 + frac * (left2 - left1));
+
 		// Linear interpolation for right channel
-		int16_t right1 = buffer[srcIndex * 2 + 1];
-		int16_t right2 = buffer[nextIndex * 2 + 1];
-		result[i * 2 + 1] = (int16_t)(right1 + frac * (right2 - right1));
+		const int16_t right1 = buffer[srcIndex * 2 + 1];
+		const int16_t right2 = buffer[nextIndex * 2 + 1];
+		result[i * 2 + 1] = static_cast<int16_t>(right1 + frac * (right2 - right1));
+
+		srcCursor += step;
 	}
-	
+
+	// Preserve leftover fractional position for the next call so streams stay phase-continuous.
+	double carry = srcCursor - static_cast<double>(srcFrames);
+	if (carry < 0.0) {
+		carry = 0.0;
+	}
+	// Avoid unbounded growth if caller feeds tiny buffers.
+	const double maxCarry = step * 4.0;
+	if (carry > maxCarry) {
+		carry = std::fmod(carry, step);
+	}
+	st.carry = carry;
+
 	return result;
 }

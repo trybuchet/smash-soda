@@ -79,8 +79,8 @@ set "VS_BUILD_TOOLS_URL=https://aka.ms/vs/18/stable/vs_buildtools.exe"
 :: --------- Install location (folder picker) ----------
 set "DEFAULT_INSTALL_PARENT=%ProgramFiles%"
 echo.
-echo Please choose the parent folder for Smash Soda.
-echo A "Smash Soda" folder will be created there.
+echo Please choose the install location.
+echo A "Smash Soda" folder will always be created inside the selected path.
 echo.
 for /f "usebackq delims=" %%i in (`%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -Command ^
   "Add-Type -AssemblyName System.Windows.Forms; " ^
@@ -96,15 +96,10 @@ if "%INSTALL_PARENT:~-1%"=="\" (
   if not "%INSTALL_PARENT:~1,2%"==":\" set "INSTALL_PARENT=%INSTALL_PARENT:~0,-1%"
 )
 
-:: If user already picked a Smash Soda folder, use it; otherwise create one under selected parent.
-for %%I in ("%INSTALL_PARENT%") do set "INSTALL_LEAF=%%~nxI"
-if /I "%INSTALL_LEAF%"=="Smash Soda" (
-  set "INSTALL_DIR=%INSTALL_PARENT%"
-) else (
-  set "INSTALL_DIR=%INSTALL_PARENT%\Smash Soda"
-)
+:: Always install into a "Smash Soda" subfolder inside the selected path.
+set "INSTALL_DIR=%INSTALL_PARENT%\Smash Soda"
 echo.
-echo Selected parent folder: "%INSTALL_PARENT%"
+echo Selected folder: "%INSTALL_PARENT%"
 echo Install folder: "%INSTALL_DIR%"
 
 :: --------- Work dirs ----------

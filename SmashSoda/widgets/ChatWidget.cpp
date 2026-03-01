@@ -26,17 +26,20 @@ bool ChatWidget::render(bool& showWindow) {
             _chatLog.erase(it, it + CHATLOG_MESSAGE_LENGTH/2);
         }
 
-        ImGui::BeginChild("Chat Log", ImVec2(0, size.y - 85));
+        ImGui::BeginChild("Chat Log", ImVec2(0, 0));
         const float previousScrollY = ImGui::GetScrollY();
         const float previousScrollMaxY = ImGui::GetScrollMaxY();
         const bool wasNearBottom = previousScrollY >= (previousScrollMaxY - 10.0f);
 
         for (size_t i = 0; i < _chatLog.size(); ++i) {
-            static float textHeight;
             cursor = ImGui::GetCursorPos();
-        
-            ImGui::TextWrapped(_chatLog[i].c_str());
-            textHeight = ImGui::GetCursorPosY() - cursor.y - 4;
+            const float wrapPos = cursor.x + ImGui::GetContentRegionAvail().x;
+
+            ImGui::PushTextWrapPos(wrapPos);
+            ImGui::TextUnformatted(_chatLog[i].c_str());
+            ImGui::PopTextWrapPos();
+
+            const float textHeight = ImGui::GetCursorPosY() - cursor.y;
 
             ImGui::SetCursorPos(cursor);
             if (ImGui::InvisibleButton(

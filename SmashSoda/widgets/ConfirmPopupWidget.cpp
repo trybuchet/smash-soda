@@ -7,11 +7,18 @@ bool ConfirmPopupWidget::render(const char* title, bool& showPopup, std::string 
     static bool result;
     result = false;
 
-    static ImVec2 BUTTON_SIZE = ImVec2(64, 64);
     static ImVec2 res;
     static ImVec2 cursor;
 
-    ImVec2 windowSize(400, 180);
+    float uiScale = ThemeController::getInstance().getUiScale();
+    if (uiScale <= 0.0f) {
+        uiScale = 1.0f;
+    }
+
+    const ImVec2 windowSize(400.0f * uiScale, 180.0f * uiScale);
+    const float contentPad = 10.0f * uiScale;
+    const float buttonGap = 12.0f * uiScale;
+
     res = ImGui::GetMainViewport()->Size;
 
     ImGui::SetNextWindowSize(windowSize);
@@ -33,12 +40,12 @@ bool ConfirmPopupWidget::render(const char* title, bool& showPopup, std::string 
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoResize))
     {
-        ImVec2 size = ImGui::GetContentRegionAvail();
+        const ImGuiStyle& style = ImGui::GetStyle();
 
         if (textString.size() > 0)
         {
             cursor = ImGui::GetCursorPos();
-            ImGui::SetCursorPos(ImVec2(cursor.x + 10, cursor.y + 10));
+            ImGui::SetCursorPos(ImVec2(cursor.x + contentPad, cursor.y + contentPad));
 
             ImGui::PushFont(AppFonts::input);
             ImGui::PushStyleColor(ImGuiCol_Text, theme->formInputText);
@@ -47,7 +54,19 @@ bool ConfirmPopupWidget::render(const char* title, bool& showPopup, std::string 
             ImGui::PopFont();
         }
 
-        ImGui::SetCursorPos(ImVec2(size.x - 158, size.y-15));
+        const float buttonPadX = 20.0f * uiScale;
+        const float buttonPadY = 10.0f * uiScale;
+        const float cancelWidth = ImGui::CalcTextSize("Cancel").x + buttonPadX;
+        const float confirmWidth = ImGui::CalcTextSize("Confirm").x + buttonPadX;
+        const float buttonsWidth = cancelWidth + buttonGap + confirmWidth;
+        const float buttonHeight = ImGui::GetTextLineHeight() + buttonPadY;
+        const ImVec2 windowPos = ImGui::GetWindowPos();
+        const ImVec2 windowSizeNow = ImGui::GetWindowSize();
+
+        const float buttonX = windowPos.x + windowSizeNow.x - style.WindowPadding.x - contentPad - buttonsWidth;
+        const float buttonY = windowPos.y + windowSizeNow.y - style.WindowPadding.y - contentPad - buttonHeight;
+
+        ImGui::SetCursorScreenPos(ImVec2(buttonX, buttonY));
 
         if (Widget::elBtnSecondary("Cancel"))
         {
@@ -55,9 +74,7 @@ bool ConfirmPopupWidget::render(const char* title, bool& showPopup, std::string 
             ImGui::CloseCurrentPopup();
         }
 
-        ImGui::SameLine();
-
-        ImGui::SetCursorPos(ImVec2(size.x - 84, size.y-15));
+        ImGui::SameLine(0.0f, buttonGap);
 
         if (Widget::elBtn("Confirm"))
         {

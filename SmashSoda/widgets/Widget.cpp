@@ -145,25 +145,27 @@ void Widget::startTabs(const std::vector<Tab>& tabs, bool footer) {
     hasFooter = footer;
 
     Theme* theme = ThemeController::getInstance().getActiveTheme();
+    const float tabsHeaderHeight = S(64.0f);
+    const float tabsBorderThickness = S(1.0f);
+    const ImU32 tabsBorderColor = ImGui::ColorConvertFloat4ToU32(theme->panelBorder);
 
     ImGui::SetCursorPos(SV(0.0f, 0.0f));
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     pos = ImGui::GetCursorScreenPos();
     drawList->AddRectFilled(
         pos,
-        ImVec2(pos.x + size.x, pos.y + S(64.0f)),
+        ImVec2(pos.x + size.x, pos.y + tabsHeaderHeight),
         ImGui::ColorConvertFloat4ToU32(theme->tabsBackground),
         S(10.0f),
         ImDrawFlags_RoundCornersBottom
     );
-
     ImGui::SetCursorPos(SV(0.0f, 0.0f));
     ImGui::Dummy(SV(0.0f, 30.0f));
 
     std::string pillsName = "##pills-" + std::string(widgetName);
     ImGui::BeginTabBar(pillsName.c_str());
 
-    ImGui::Dummy(SV(20.0f, 10.0f));
+    ImGui::Dummy(SV(20.0f, 0.0f));
     ImGui::Indent(S(20.0f));
 
     for (int i = 0; i < tabs.size(); i++) {
@@ -182,6 +184,15 @@ void Widget::startTabs(const std::vector<Tab>& tabs, bool footer) {
 
         if (ImGui::BeginTabItem(tabs[i].name)) {
             activeTab = i;
+            const float seamOffset = ImGui::GetStyle().ItemSpacing.y;
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() - seamOffset);
+            const ImVec2 contentStart = ImGui::GetCursorScreenPos();
+            drawList->AddLine(
+                ImVec2(pos.x, contentStart.y),
+                ImVec2(pos.x + size.x, contentStart.y),
+                tabsBorderColor,
+                tabsBorderThickness
+            );
             tabs[i].render();
             ImGui::EndTabItem();
         }

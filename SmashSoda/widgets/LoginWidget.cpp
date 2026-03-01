@@ -8,6 +8,16 @@ LoginWidget::LoginWidget(Hosting& hosting, HostSettingsWidget& hostSettingsWidge
 
 void LoginWidget::render(bool& showLogin) {
 
+    float uiScale = ThemeController::getInstance().getUiScale();
+    if (uiScale <= 0.0f) {
+        uiScale = 1.0f;
+    }
+
+    const float loginWindowWidth = 350.0f * uiScale;
+    const float loginWindowHeight = 500.0f * uiScale;
+    const float logoWidth = 200.0f * uiScale;
+    const float logoHeight = 49.0f * uiScale;
+
     ImGui::PushStyleColor(ImGuiCol_Text, AppColors::panelTitleBarActiveText);  // Focused text color
     ImGui::PushStyleColor(ImGuiCol_Border, AppColors::panelBorderActive);
 
@@ -18,8 +28,8 @@ void LoginWidget::render(bool& showLogin) {
     size = ImGui::GetIO().DisplaySize;
 
     // Set window position and size constraints
-    ImGui::SetNextWindowPos(ImVec2((size.x/2)-175, (size.y / 2) - 250));
-    ImGui::SetNextWindowSizeConstraints(ImVec2(350, 500), ImVec2(350, 500));
+    ImGui::SetNextWindowPos(ImVec2((size.x - loginWindowWidth) * 0.5f, (size.y - loginWindowHeight) * 0.5f));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(loginWindowWidth, loginWindowHeight), ImVec2(loginWindowWidth, loginWindowHeight));
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0.2f));
@@ -36,15 +46,15 @@ void LoginWidget::render(bool& showLogin) {
 
     startBody(true);
 
-        ImGui::Dummy(ImVec2(0, 10));
-        ImGui::SetCursorPosX((size.x - 200.0f) * 0.5f);
-        ImGui::Image(AppIcons::logo, ImVec2(200, 49));
+        ImGui::Dummy(ImVec2(0, 10.0f * uiScale));
+        ImGui::SetCursorPosX((size.x - logoWidth) * 0.5f);
+        ImGui::Image(AppIcons::logo, ImVec2(logoWidth, logoHeight));
 
-        ImGui::Dummy(ImVec2(0, 20));
+        ImGui::Dummy(ImVec2(0, 20.0f * uiScale));
 
         elParagraph("This app uses the Parsec service for sharing your screen with other players.");
 
-        renderPersonal(350, showLogin);
+        renderPersonal(loginWindowWidth, showLogin);
 
     endBody();
 
@@ -57,7 +67,7 @@ void LoginWidget::render(bool& showLogin) {
             }
 
             ImGui::SameLine();
-            ImGui::Indent(68);
+            ImGui::Indent(68.0f * uiScale);
 
             if (elBtnSecondary("Create new account")) {
                 ShellExecute(0, 0, L"https://parsec.app/activate/", 0, 0, SW_SHOW);
@@ -66,8 +76,8 @@ void LoginWidget::render(bool& showLogin) {
         } else {
             static ImVec2 cursor;
             cursor = ImGui::GetCursorPos();
-            cursor.x += 140;
-            cursor.y -= 10;
+            cursor.x += 140.0f * uiScale;
+            cursor.y -= 10.0f * uiScale;
             ImGui::SetCursorPos(cursor);
             LoadingRingWidget::render();
         }
@@ -220,8 +230,13 @@ void LoginWidget::attemptLogin3rd(bool& showLogin)
 
 void LoginWidget::renderSodaArcadeLogin() {
 
+    float uiScale = ThemeController::getInstance().getUiScale();
+    if (uiScale <= 0.0f) {
+        uiScale = 1.0f;
+    }
+
     static ImVec2 res;
-    size = ImVec2(400, 564);
+    size = ImVec2(400.0f * uiScale, 564.0f * uiScale);
 
     res = ImGui::GetMainViewport()->Size;
 
@@ -244,8 +259,8 @@ void LoginWidget::renderSodaArcadeLogin() {
     startBody(true);
 
         // Center image
-	    ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.5f - 100);
-        ImGui::Image(AppIcons::sodaArcadeLogo, ImVec2(200, 46));
+	    ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.5f - (100.0f * uiScale));
+        ImGui::Image(AppIcons::sodaArcadeLogo, ImVec2(200.0f * uiScale, 46.0f * uiScale));
 
         // Text with wrap
         if (sodaArcadeError.empty()) {
@@ -254,10 +269,10 @@ void LoginWidget::renderSodaArcadeLogin() {
 			ImGui::PushStyleColor(ImGuiCol_Text, theme->negative);
 			ImGui::TextWrapped(sodaArcadeError.c_str());
             ImGui::PopStyleColor();
-            ImGui::Dummy(ImVec2(0, 10));
+            ImGui::Dummy(ImVec2(0, 10.0f * uiScale));
 		}
 
-	    ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.5f - 112);
+        ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.5f - (112.0f * uiScale));
 
         if (elBtnSecondary("I don't want to use Soda Arcade")) {
 		    Cache::cache.showSodaArcadeLogin = false;
@@ -265,7 +280,7 @@ void LoginWidget::renderSodaArcadeLogin() {
 		    Config::cfg.Save();
         }
 
-	    ImGui::Dummy(ImVec2(0, 10));
+        ImGui::Dummy(ImVec2(0, 10.0f * uiScale));
 
         if (elText("E-Mail Address", _email, "The e-mail address you signed up to Soda Arcade with.")) {
 
@@ -307,17 +322,17 @@ void LoginWidget::renderSodaArcadeLogin() {
 
             }
             ImGui::SameLine();
-            ImGui::Indent(65);
+            ImGui::Indent(65.0f * uiScale);
             if (elBtnSecondary("Create account")) {
                 const wchar_t* link = L"https://soda-arcade.com/register";
                 ShellExecute(0, 0, link, 0, 0, SW_SHOW);
             }
-            ImGui::Unindent(65);
+            ImGui::Unindent(65.0f * uiScale);
         } else {
             static ImVec2 cursor;
             cursor = ImGui::GetCursorPos();
-            cursor.x += 164;
-            cursor.y -= 10;
+            cursor.x += 164.0f * uiScale;
+            cursor.y -= 10.0f * uiScale;
             ImGui::SetCursorPos(cursor);
             LoadingRingWidget::render();
 		}

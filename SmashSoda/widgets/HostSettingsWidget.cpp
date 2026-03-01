@@ -11,7 +11,7 @@ HostSettingsWidget::HostSettingsWidget(Hosting& hosting, function<void(bool)> on
         strcpy_s(_gameID, cfg.gameID);
         strcpy_s(_roomName, (Config::cfg.room.name.size() < 255 ? Config::cfg.room.name.c_str() : ""));
         strcpy_s(_gameName, (Config::cfg.room.game.size() < 255 ? Config::cfg.room.game.c_str() : ""));
-		strcpy_s(_description, (Config::cfg.room.details.size() < 500 ? Config::cfg.room.details.c_str() : ""));
+        strcpy_s(_description, (Config::cfg.room.details.size() <= 500 ? Config::cfg.room.details.c_str() : ""));
         strcpy_s(_secret, cfg.secret);
         strcpy_s(_kioskApplication, "");
         strcpy_s(_kioskParam, "");
@@ -199,6 +199,20 @@ bool HostSettingsWidget::render(bool& showWindow, HWND& hwnd) {
         }
 
         updateSecretLink();
+    }
+
+    if (!Config::cfg.room.privateRoom) {
+        // if (elText("Stream URL", _streamUrl, "If you're streaming on Twitch.tv, you can add your Twitch stream URL here to have it appear on Soda Arcade. Max 255 characters.")) {
+        //     if (_hosting.isRunning()) {
+        //         _updated = true;
+        //     }
+        // }
+
+        if (elTextArea("Room Details", _description, "Optional room details shown on Soda Arcade. Max 500 characters.")) {
+            if (_hosting.isRunning()) {
+                _updated = true;
+            }
+        }
     }
 
     const bool isArcadeAuthenticated = !Arcade::instance.credentials.token.empty();

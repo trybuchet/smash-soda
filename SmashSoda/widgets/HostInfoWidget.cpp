@@ -12,19 +12,23 @@ void HostInfoWidget::renderArcade() {
 	if (theme == nullptr) {
 		return;
 	}
+	float uiScale = ThemeController::getInstance().getUiScale();
+	if (uiScale <= 0.0f) {
+		uiScale = 1.0f;
+	}
 
-	static ImVec2 windowSize = ImVec2(250, 64);
-	static ImVec2 windowPos = ImVec2(0, 0);
-	static ImVec2 padding = ImVec2(8, 6);
+	const ImVec2 windowSize = ImVec2(250.0f * uiScale, 64.0f * uiScale);
+	ImVec2 windowPos = ImVec2(0, 0);
+	const ImVec2 padding = ImVec2(8.0f * uiScale, 6.0f * uiScale);
 	static ImVec2 viewportSize;
 	viewportSize = ImGui::GetMainViewport()->GetCenter();
 	viewportSize.x *= 2;
 	viewportSize.y *= 2;
 
-	windowPos.x = viewportSize.x - windowSize.x - 10;
-	windowPos.y = (viewportSize.y - windowSize.y) - 78;
+	windowPos.x = viewportSize.x - windowSize.x - (10.0f * uiScale);
+	windowPos.y = (viewportSize.y - windowSize.y) - (78.0f * uiScale);
 
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 6));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, padding);
 
 	ImGui::Begin(
 		"##ArcadeInfoWidget", (bool*)0,
@@ -38,13 +42,13 @@ void HostInfoWidget::renderArcade() {
 	ImGui::SetWindowPos(windowPos);
 
 	ImGui::BeginGroup();
-		ImGui::Image(AppIcons::arcadeIcon, ImVec2(48, 48));
+		ImGui::Image(AppIcons::arcadeIcon, ImVec2(48.0f * uiScale, 48.0f * uiScale));
 		ImGui::SameLine();
 
 		// Move cursor UP a bit
 		static ImVec2 cursor;
 		cursor = ImGui::GetCursorPos();
-		cursor.y -= 2;
+		cursor.y -= 2.0f * uiScale;
 		ImGui::SetCursorPos(cursor);
 
 		ImGui::BeginGroup();
@@ -57,7 +61,7 @@ void HostInfoWidget::renderArcade() {
 				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme->buttonSecondaryHovered);
 				ImGui::PushStyleColor(ImGuiCol_Text, theme->buttonSecondaryText);
 
-				ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 2));
+				ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f * uiScale, 2.0f * uiScale));
 				if (ImGui::Button("Logout")) {
 					Arcade::instance.logout();
 				}
@@ -80,7 +84,7 @@ void HostInfoWidget::renderArcade() {
 				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme->buttonSecondaryHovered);
 				ImGui::PushStyleColor(ImGuiCol_Text, theme->buttonSecondaryText);
 
-				ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 2));
+				ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f * uiScale, 2.0f * uiScale));
 				if (ImGui::Button("Login")) {
 					Config::cfg.arcade.showLogin = true;
 				}
@@ -106,21 +110,25 @@ void HostInfoWidget::render() {
 	if (theme == nullptr) {
 		return;
 	}
+	float uiScale = ThemeController::getInstance().getUiScale();
+	if (uiScale <= 0.0f) {
+		uiScale = 1.0f;
+	}
 
 	static bool isSessionExpired = false;
 	isSessionExpired = (_hosting.getHost().status == Guest::Status::EXPIRED);
 
-	static ImVec2 windowSize = ImVec2(250, 60);
-	static ImVec2 windowPos = ImVec2(0, 0);
-	static ImVec2 padding = ImVec2(8, 6);
+	const ImVec2 windowSize = ImVec2(250.0f * uiScale, 60.0f * uiScale);
+	ImVec2 windowPos = ImVec2(0, 0);
+	const ImVec2 padding = ImVec2(8.0f * uiScale, 6.0f * uiScale);
 	static ImVec2 viewportSize;
 	viewportSize = ImGui::GetMainViewport()->GetCenter();
 	viewportSize.x *= 2;
 	viewportSize.y *= 2;
-	windowPos.x = viewportSize.x - windowSize.x - 10;
-	windowPos.y = viewportSize.y - windowSize.y - 10;
+	windowPos.x = viewportSize.x - windowSize.x - (10.0f * uiScale);
+	windowPos.y = viewportSize.y - windowSize.y - (10.0f * uiScale);
 
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 6));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, padding);
 
 	ImGui::Begin(
 		"##HostInfoWidget", (bool*)0,
@@ -152,14 +160,14 @@ void HostInfoWidget::render() {
 		}
 
 
-		static float radius = 20;
-		static float thickness = radius * 0.5f;
+		const float radius = 20.0f * uiScale;
+		const float thickness = radius * 0.5f;
 		
 		ImGui::BeginGroup();
 
 		static ImVec2 cursor;
 		cursor = ImGui::GetCursorPos();
-		cursor.y += 2;
+		cursor.y += 2.0f * uiScale;
 		ImGui::SetCursorPosY(cursor.y);
 
 		ProgressCircularWidget::render(
@@ -197,19 +205,19 @@ void HostInfoWidget::render() {
 		ImGui::EndGroup();
 
 		ImGui::SameLine();
-		ImGui::Dummy(ImVec2(2, 0));
+		ImGui::Dummy(ImVec2(2.0f * uiScale, 0));
 		ImGui::SameLine();
 	}
 
 	ImGui::BeginGroup();
 	if (_hosting.getHost().isValid()) {
-		ImGui::Image(AppIcons::parsecIcon, ImVec2(48, 48));
+		ImGui::Image(AppIcons::parsecIcon, ImVec2(48.0f * uiScale, 48.0f * uiScale));
 		ImGui::SameLine();
 
 		// Move cursor UP a bit
 		static ImVec2 cursor;
 		cursor = ImGui::GetCursorPos();
-		cursor.y -= 4;
+		cursor.y -= 4.0f * uiScale;
 		ImGui::SetCursorPos(cursor);
 
 		ImGui::PushFont(AppFonts::label);
@@ -227,7 +235,7 @@ void HostInfoWidget::render() {
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme->buttonSecondaryHovered);
 			ImGui::PushStyleColor(ImGuiCol_Text, theme->buttonSecondaryText);
 
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 2));
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f * uiScale, 2.0f * uiScale));
 			if (ImGui::Button("Logout")) {
 				_hosting.getSession().deleteSessionCache();
 			}
