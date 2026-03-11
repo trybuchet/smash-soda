@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <string>
 #include <direct.h>
@@ -60,6 +60,8 @@ public:
 		int windowW = 1280;
 		int windowH = 720;
 		unsigned int resolutionIndex = 0;
+		bool lanczos = true;
+		unsigned int captureMethod = 0;
 		unsigned int fps = 60;
 		unsigned int bandwidth = 20;
 	};

@@ -1,4 +1,4 @@
-﻿#include "VideoWidget.h"
+#include "VideoWidget.h"
 
 VideoWidget::VideoWidget(Hosting& hosting)
     : _hosting(hosting), _dx11(_hosting.getDX11())
@@ -65,6 +65,25 @@ bool VideoWidget::render(bool& showWindow)
 	}
 
     // =========================================================
+    // Capture Method
+    // =========================================================
+    static unsigned int currentCaptureMethod = Config::cfg.video.captureMethod;
+    currentCaptureMethod = (unsigned int)_dx11.getCaptureMethod();
+
+    std::vector<std::pair<std::string, std::string>> captureOptions;
+    captureOptions.push_back({ "0", "Auto" });
+    captureOptions.push_back({ "1", "DXGI Duplication" });
+    if (DX11::isWGCSupported()) {
+        captureOptions.push_back({ "2", "Graphics Capture (fullscreen)" });
+    }
+
+    string captureCallback = to_string(currentCaptureMethod);
+    if (elSelect("Capture", captureOptions, captureCallback, "Screen capture method.\nGraphics Capture supports exclusive fullscreen games (Windows 10 2004+).")) {
+        currentCaptureMethod = stoul(captureCallback);
+        _dx11.setCaptureMethod((DX11::CaptureMethod)currentCaptureMethod);
+    }
+
+    // =========================================================
     // Resolution
     // =========================================================
     static unsigned int currentResolutionIndex = Config::cfg.video.resolutionIndex;
@@ -87,6 +106,17 @@ bool VideoWidget::render(bool& showWindow)
         
         Config::cfg.Save();
     }
+
+    // =========================================================
+    // Lanczos Filter
+    // =========================================================
+    static bool lanczosEnabled = Config::cfg.video.lanczos;
+    lanczosEnabled = _dx11.isLanczosEnabled();
+
+    if (ImGui::Checkbox("Lanczos Filter", &lanczosEnabled)) {
+        _dx11.setLanczosEnabled(lanczosEnabled);
+    }
+    TooltipWidget::render("High-quality scaling filter applied when output resolution differs from native.\nDisable to send frames at native resolution.");
 
     // =========================================================
     // Bandwidth

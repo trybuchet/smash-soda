@@ -1,4 +1,4 @@
-﻿#include "../services/WebSocket.h"
+#include "../services/WebSocket.h"
 #include "Config.h"
 #include "../Hosting.h"
 #include "../helpers/Countries.h"
@@ -111,6 +111,8 @@ void Config::Load() {
 			cfg.video.windowW = setValue(cfg.video.windowW, j["Video"]["windowW"].get<int>());
 			cfg.video.windowH = setValue(cfg.video.windowH, j["Video"]["windowH"].get<int>());
 			cfg.video.resolutionIndex = setValue(cfg.video.resolutionIndex, j["Video"]["resolutionIndex"].get<unsigned int>());
+			cfg.video.lanczos = setValue(cfg.video.lanczos, j["Video"]["lanczos"].get<bool>());
+			cfg.video.captureMethod = setValue(cfg.video.captureMethod, j["Video"]["captureMethod"].get<unsigned int>());
 			cfg.video.fps = setValue(cfg.video.fps, j["Video"]["fps"].get<unsigned int>());
 			cfg.video.bandwidth = setValue(cfg.video.bandwidth, j["Video"]["bandwidth"].get<unsigned int>());
 
@@ -365,6 +367,8 @@ void Config::Save() {
 		{"windowW", cfg.video.windowW},
 		{"windowH", cfg.video.windowH},
 		{"resolutionIndex", cfg.video.resolutionIndex},
+		{"lanczos", cfg.video.lanczos},
+		{"captureMethod", cfg.video.captureMethod},
 		{"fps", cfg.video.fps},
 		{"bandwidth", cfg.video.bandwidth}
 	};

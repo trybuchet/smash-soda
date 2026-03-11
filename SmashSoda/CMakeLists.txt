@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.18)
 
 if(NOT WIN32)
     message(FATAL_ERROR "Smash Soda can only be built on Windows.")
@@ -182,6 +182,14 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     d3d9
     shlwapi
     d3d11
+    windowsapp
+)
+
+set_source_files_properties(
+    "${CMAKE_CURRENT_SOURCE_DIR}/WGCapture.cpp"
+    PROPERTIES
+        SKIP_UNITY_BUILD_INCLUSION ON
+        SKIP_PRECOMPILE_HEADERS ON
 )
 
 # --------------------------

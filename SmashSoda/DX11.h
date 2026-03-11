@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <d3d11.h>
 #include <dxgi.h>
@@ -11,6 +11,7 @@
 #include <string>
 #include <mutex>
 #include "Core/Config.h"
+#include "WGCapture.h"
 #include <locale>
 #include <codecvt>
 
@@ -28,6 +29,8 @@ class DX11
 
 
 public:
+	enum class CaptureMethod { Auto = 0, DesktopDupl = 1, GraphicsCapture = 2 };
+
 	void clear();
 	bool recover();
 	bool recover2();
@@ -55,6 +58,13 @@ public:
 	void getTargetResolution(int& width, int& height);
 	void getNativeResolution(int& width, int& height);
 	bool isScalingEnabled();
+	void setLanczosEnabled(bool enabled);
+	bool isLanczosEnabled() const;
+
+	// Capture method
+	void setCaptureMethod(CaptureMethod method);
+	CaptureMethod getCaptureMethod() const;
+	static bool isWGCSupported();
 
 private:
 	void fetchScreenList();
@@ -62,7 +72,11 @@ private:
 	bool createScaledRenderTarget(int width, int height);
 	void releaseScaledRenderTarget();
 	ID3D11Texture2D* scaleTexture(ID3D11Texture2D* source);
-	
+
+	HMONITOR getMonitorHandle();
+	bool captureScreenWGC(ParsecDSO* ps);
+	bool captureScreenDupl(ParsecDSO* ps);
+
 	mutex _mutex;
 
 	// Windows
@@ -94,7 +108,13 @@ private:
 	ID3D11PixelShader* _pixelShader = nullptr;
 	ID3D11InputLayout* _inputLayout = nullptr;
 	ID3D11Buffer* _vertexBuffer = nullptr;
+	ID3D11Buffer* _lanczosParamsCB = nullptr;
 	bool _scalingInitialized = false;
+	bool _lanczosEnabled = true;
+
+	// Windows Graphics Capture
+	CaptureMethod _captureMethod = CaptureMethod::Auto;
+	WGCapture _wgCapture;
 };
 
 

@@ -19,7 +19,7 @@ DXGI_OUTPUT_DESC _lOutputDesc;
 DXGI_OUTDUPL_DESC _lOutputDuplDesc;
 D3D11_MAPPED_SUBRESOURCE _resource;
 
-// Simple fullscreen quad shaders for scaling
+// Lanczos-2 fullscreen quad shaders for high-quality scaling
 const char* g_ScaleShaderCode = R"(
 struct VS_INPUT {
     float2 pos : POSITION;
@@ -41,8 +41,42 @@ PS_INPUT VSMain(VS_INPUT input) {
 Texture2D sourceTexture : register(t0);
 SamplerState samplerLinear : register(s0);
 
+cbuffer LanczosParams : register(b0) {
+    float2 srcSize;
+    float2 srcTexelSize;
+};
+
+static const float PI = 3.14159265358979;
+
+float sinc_f(float x) {
+    float px = x * PI;
+    return (abs(x) < 0.0001) ? 1.0 : sin(px) / px;
+}
+
+float lanczos2(float x) {
+    return (abs(x) < 2.0) ? sinc_f(x) * sinc_f(x * 0.5) : 0.0;
+}
+
 float4 PSMain(PS_INPUT input) : SV_TARGET {
-    return sourceTexture.Sample(samplerLinear, input.tex);
+    float2 srcPos = input.tex * srcSize;
+    float2 center = floor(srcPos - 0.5) + 0.5;
+    float2 f = srcPos - center;
+
+    float4 color = float4(0, 0, 0, 0);
+    float totalW = 0;
+
+    [unroll] for (int y = -1; y <= 2; y++) {
+        float wy = lanczos2(f.y - (float)y);
+        [unroll] for (int x = -1; x <= 2; x++) {
+            float wx = lanczos2(f.x - (float)x);
+            float w = wx * wy;
+            float2 sampleUV = (center + float2(x, y)) * srcTexelSize;
+            color += sourceTexture.Sample(samplerLinear, sampleUV) * w;
+            totalW += w;
+        }
+    }
+
+    return color / totalW;
 }
 )";
 
@@ -64,6 +98,7 @@ void DX11::releaseScaledRenderTarget()
 	SAFE_RELEASE(_pixelShader);
 	SAFE_RELEASE(_inputLayout);
 	SAFE_RELEASE(_vertexBuffer);
+	SAFE_RELEASE(_lanczosParamsCB);
 	_scalingInitialized = false;
 }
 
@@ -141,6 +176,9 @@ bool DX11::clearAndRecover()
 	_mutex.lock();
 	clear();
 	bool result = recover();
+	if (result && _targetWidth > 0 && _targetHeight > 0) {
+		createScaledRenderTarget(_targetWidth, _targetHeight);
+	}
 	_mutex.unlock();
 	return result;
 }
@@ -196,8 +234,11 @@ void DX11::enumGPUS()
 
 bool DX11::init()
 {
+	_wgCapture.stop();
 	_currentScreen = Config::cfg.video.monitor;
 	_currentGPU = Config::cfg.video.adapter;
+	_captureMethod = (CaptureMethod)Config::cfg.video.captureMethod;
+	_lanczosEnabled = Config::cfg.video.lanczos;
 	enumGPUS();
 
 	D3D_FEATURE_LEVEL lFeatureLevel;
@@ -234,6 +275,60 @@ bool DX11::init()
 
 bool DX11::captureScreen(ParsecDSO* ps)
 {
+	bool useWGC = (_captureMethod == CaptureMethod::GraphicsCapture) ||
+	              (_captureMethod == CaptureMethod::Auto && WGCapture::isSupported());
+
+	if (useWGC)
+	{
+		if (captureScreenWGC(ps))
+			return true;
+
+		if (_captureMethod == CaptureMethod::GraphicsCapture)
+			return false;
+	}
+
+	return captureScreenDupl(ps);
+}
+
+bool DX11::captureScreenWGC(ParsecDSO* ps)
+{
+	if (!_wgCapture.isActive())
+	{
+		HMONITOR hmon = getMonitorHandle();
+		if (!hmon) return false;
+		if (!_wgCapture.start(_device, _context, hmon))
+			return false;
+	}
+
+	_mutex.lock();
+
+	ID3D11Texture2D* frame = _wgCapture.acquireFrame();
+	if (!frame)
+	{
+		_mutex.unlock();
+		return false;
+	}
+
+	D3D11_TEXTURE2D_DESC frameDesc;
+	frame->GetDesc(&frameDesc);
+	_desc.Width = frameDesc.Width;
+	_desc.Height = frameDesc.Height;
+
+	ID3D11Texture2D* frameToSubmit = frame;
+	if (isScalingEnabled())
+	{
+		ID3D11Texture2D* scaled = scaleTexture(frame);
+		if (scaled) frameToSubmit = scaled;
+	}
+
+	ParsecHostD3D11SubmitFrame(ps, 0, _device, _context, frameToSubmit);
+
+	_mutex.unlock();
+	return true;
+}
+
+bool DX11::captureScreenDupl(ParsecDSO* ps)
+{
 	if (!_deskDupl)
 	{
 		if (!clearAndRecover())
@@ -250,7 +345,6 @@ bool DX11::captureScreen(ParsecDSO* ps)
 
 	hr = _deskDupl->AcquireNextFrame(4, &lFrameInfo, &lDesktopResource);
 	if (FAILED(hr)) {
-		// Only release frame if we actually acquired one (not on timeout/error)
 		if (lDesktopResource != nullptr) {
 			lDesktopResource->Release();
 			_deskDupl->ReleaseFrame();
@@ -265,11 +359,10 @@ bool DX11::captureScreen(ParsecDSO* ps)
 		return false;
 	}
 
-	// Release the previous acquired image before getting a new one
 	SAFE_RELEASE(_lAcquiredDesktopImage);
 
 	hr = lDesktopResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&_lAcquiredDesktopImage);
-	lDesktopResource->Release(); // Done with this, release it
+	lDesktopResource->Release();
 	lDesktopResource = nullptr;
 
 	if (FAILED(hr) || _lAcquiredDesktopImage == nullptr)
@@ -279,7 +372,6 @@ bool DX11::captureScreen(ParsecDSO* ps)
 		return false;
 	}
 
-	// Check if we need to scale the frame
 	ID3D11Texture2D* frameToSubmit = _lAcquiredDesktopImage;
 	if (isScalingEnabled())
 	{
@@ -298,6 +390,32 @@ bool DX11::captureScreen(ParsecDSO* ps)
 	return true;
 }
 
+HMONITOR DX11::getMonitorHandle()
+{
+	if (!_device) return nullptr;
+
+	IDXGIDevice* dxgiDevice = nullptr;
+	_device->QueryInterface(__uuidof(IDXGIDevice), (void**)&dxgiDevice);
+	if (!dxgiDevice) return nullptr;
+
+	IDXGIAdapter* adapter = nullptr;
+	dxgiDevice->GetParent(__uuidof(IDXGIAdapter), (void**)&adapter);
+	dxgiDevice->Release();
+	if (!adapter) return nullptr;
+
+	IDXGIOutput* output = nullptr;
+	HRESULT hr = adapter->EnumOutputs(_currentScreen, &output);
+	adapter->Release();
+	if (FAILED(hr) || !output) return nullptr;
+
+	DXGI_OUTPUT_DESC desc;
+	hr = output->GetDesc(&desc);
+	output->Release();
+	if (FAILED(hr)) return nullptr;
+
+	return desc.Monitor;
+}
+
 vector<string> DX11::listScreens()
 {
 	return _screens;
@@ -307,6 +425,7 @@ void DX11::setScreen(UINT index)
 {
 	if (index < _screens.size())
 	{
+		_wgCapture.stop();
 		_currentScreen = index;
 		Config::cfg.video.monitor = index;
 		Config::cfg.Save();
@@ -328,6 +447,7 @@ void DX11::setGPU(size_t index)
 {
 	if (index < _gpus.size())
 	{
+		_wgCapture.stop();
 		_mutex.lock();
 		_currentGPU = index;
 		Config::cfg.video.adapter = index;
@@ -600,6 +720,26 @@ vector<uint8_t> DX11::getScreenshot(int& width, int& height)
     return bmpData;
 }
 
+// Capture method
+void DX11::setCaptureMethod(CaptureMethod method)
+{
+	if (_captureMethod == method) return;
+	_wgCapture.stop();
+	_captureMethod = method;
+	Config::cfg.video.captureMethod = (unsigned int)method;
+	Config::cfg.Save();
+}
+
+DX11::CaptureMethod DX11::getCaptureMethod() const
+{
+	return _captureMethod;
+}
+
+bool DX11::isWGCSupported()
+{
+	return WGCapture::isSupported();
+}
+
 // Resolution scaling methods
 bool DX11::setTargetResolution(int width, int height)
 {
@@ -646,8 +786,20 @@ void DX11::getNativeResolution(int& width, int& height)
 
 bool DX11::isScalingEnabled()
 {
-	return _scalingInitialized && _targetWidth > 0 && _targetHeight > 0 && 
+	return _lanczosEnabled && _scalingInitialized && _targetWidth > 0 && _targetHeight > 0 && 
 	       (_targetWidth != (int)_desc.Width || _targetHeight != (int)_desc.Height);
+}
+
+void DX11::setLanczosEnabled(bool enabled)
+{
+	_lanczosEnabled = enabled;
+	Config::cfg.video.lanczos = enabled;
+	Config::cfg.Save();
+}
+
+bool DX11::isLanczosEnabled() const
+{
+	return _lanczosEnabled;
 }
 
 bool DX11::createScaledRenderTarget(int width, int height)
@@ -780,6 +932,20 @@ bool DX11::createScaledRenderTarget(int width, int height)
 		return false;
 	}
 	
+	// Create constant buffer for Lanczos shader params
+	D3D11_BUFFER_DESC cbDesc = {};
+	cbDesc.Usage = D3D11_USAGE_DYNAMIC;
+	cbDesc.ByteWidth = 16; // float2 srcSize + float2 srcTexelSize = 16 bytes
+	cbDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	cbDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	
+	hr = _device->CreateBuffer(&cbDesc, nullptr, &_lanczosParamsCB);
+	if (FAILED(hr))
+	{
+		releaseScaledRenderTarget();
+		return false;
+	}
+	
 	_scalingInitialized = true;
 	return true;
 }
@@ -830,6 +996,22 @@ ID3D11Texture2D* DX11::scaleTexture(ID3D11Texture2D* sourceTexture)
 	// Set render target
 	_context->OMSetRenderTargets(1, &_scaledRTV, nullptr);
 	
+	// Update Lanczos constant buffer with source dimensions
+	if (_lanczosParamsCB)
+	{
+		D3D11_MAPPED_SUBRESOURCE mapped;
+		HRESULT mapHr = _context->Map(_lanczosParamsCB, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+		if (SUCCEEDED(mapHr))
+		{
+			float* cbData = (float*)mapped.pData;
+			cbData[0] = (float)srcDesc.Width;   // srcSize.x
+			cbData[1] = (float)srcDesc.Height;  // srcSize.y
+			cbData[2] = 1.0f / (float)srcDesc.Width;   // srcTexelSize.x
+			cbData[3] = 1.0f / (float)srcDesc.Height;  // srcTexelSize.y
+			_context->Unmap(_lanczosParamsCB, 0);
+		}
+	}
+
 	// Set up pipeline
 	_context->IASetInputLayout(_inputLayout);
 	_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -842,6 +1024,7 @@ ID3D11Texture2D* DX11::scaleTexture(ID3D11Texture2D* sourceTexture)
 	_context->PSSetShader(_pixelShader, nullptr, 0);
 	_context->PSSetShaderResources(0, 1, &_sourceSRV);
 	_context->PSSetSamplers(0, 1, &_samplerState);
+	_context->PSSetConstantBuffers(0, 1, &_lanczosParamsCB);
 	
 	// Draw fullscreen quad
 	_context->Draw(4, 0);
