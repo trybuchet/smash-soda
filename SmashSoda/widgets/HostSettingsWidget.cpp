@@ -202,11 +202,11 @@ bool HostSettingsWidget::render(bool& showWindow, HWND& hwnd) {
     }
 
     if (!Config::cfg.room.privateRoom) {
-        // if (elText("Stream URL", _streamUrl, "If you're streaming on Twitch.tv, you can add your Twitch stream URL here to have it appear on Soda Arcade. Max 255 characters.")) {
-        //     if (_hosting.isRunning()) {
-        //         _updated = true;
-        //     }
-        // }
+        if (elText("Stream URL", _streamUrl, "If you're streaming on Twitch.tv, you can add your Twitch stream URL here to have it appear on Soda Arcade. Max 255 characters.")) {
+            if (_hosting.isRunning()) {
+                _updated = true;
+            }
+        }
 
         if (elTextArea("Room Details", _description, "Optional room details shown on Soda Arcade. Max 500 characters.")) {
             if (_hosting.isRunning()) {

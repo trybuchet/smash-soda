@@ -66,12 +66,6 @@ static HANDLE g_hookReadyEvent = NULL;
 static float g_uiScale = 1.0f;
 
 // Lightweight debug logging for window state transitions.
-static void DebugLogWindowMsg(const char* tag, WPARAM wParam, LPARAM lParam) {
-    char buf[160];
-    sprintf_s(buf, sizeof(buf), "[Wnd] %s wParam=0x%lX lParam=0x%lX\n", tag, static_cast<unsigned long>(wParam), static_cast<unsigned long>(lParam));
-    OutputDebugStringA(buf);
-}
-
 // Forward declarations of helper functions
 bool CreateDeviceD3D(HWND hWnd);
 void CleanupDeviceD3D();
@@ -690,22 +684,21 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
         }
         break;
     case WM_SIZE:
-        if (g_hosting.mainWindow == hWnd) {
-            DebugLogWindowMsg("WM_SIZE", wParam, lParam);
+        if (wParam == SIZE_MINIMIZED) {
+            return 0; // Don't resize or persist while minimized.
         }
-        if (wParam != SIZE_MINIMIZED) {
-            if (g_pd3dDevice != NULL)
-            {
-                CleanupRenderTarget();
-                g_pSwapChain->ResizeBuffers(0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN, 0);
-                CreateRenderTarget();
-            }
 
-            if (g_hosting.mainWindow == hWnd && (wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED)) {
-                PersistWindowRect(hWnd, /*savePosition=*/true, /*saveSize=*/true);
-            }
+        if (g_pd3dDevice != NULL)
+        {
+            CleanupRenderTarget();
+            g_pSwapChain->ResizeBuffers(0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN, 0);
+            CreateRenderTarget();
         }
-        break; // Let DefWindowProc handle final state changes.
+
+        if (g_hosting.mainWindow == hWnd && (wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED)) {
+            PersistWindowRect(hWnd, /*savePosition=*/true, /*saveSize=*/true);
+        }
+        return 0;
     case WM_DPICHANGED:
         if (lParam != 0) {
             const RECT* suggestedRect = reinterpret_cast<RECT*>(lParam);
@@ -720,20 +713,17 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
         ApplyWindowDpiScale(hWnd);
         return 0;
-    case WM_SYSCOMMAND:
-        if (g_hosting.mainWindow == hWnd) {
-            DebugLogWindowMsg("WM_SYSCOMMAND", wParam, lParam);
-        }
-        {
-            const UINT command = (wParam & 0xfff0);
-            if (command == SC_RESTORE) {
+    case WM_ACTIVATEAPP:
+        if (g_hosting.mainWindow == hWnd && wParam == TRUE) {
+            // If taskbar activated us while minimized/hidden, force a restore + foreground.
+            if (IsIconic(hWnd) || !IsWindowVisible(hWnd)) {
                 ShowWindow(hWnd, SW_RESTORE);
                 SetForegroundWindow(hWnd);
                 UpdateWindow(hWnd);
-                return 0; // Explicitly handled restore.
             }
         }
-
+        break;
+    case WM_SYSCOMMAND:
         if ((wParam & 0xfff0) == SC_KEYMENU) // Disable ALT application menu
             return 0;
         break;

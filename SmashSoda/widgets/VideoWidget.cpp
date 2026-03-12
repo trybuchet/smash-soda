@@ -78,7 +78,7 @@ bool VideoWidget::render(bool& showWindow)
     }
 
     string captureCallback = to_string(currentCaptureMethod);
-    if (elSelect("Capture", captureOptions, captureCallback, "Screen capture method.\nGraphics Capture supports exclusive fullscreen games (Windows 10 2004+).")) {
+    if (elSelect("Screen Capture Method", captureOptions, captureCallback, "Graphics Capture supports exclusive fullscreen games (Windows 10 2004+).")) {
         currentCaptureMethod = stoul(captureCallback);
         _dx11.setCaptureMethod((DX11::CaptureMethod)currentCaptureMethod);
     }
@@ -113,10 +113,10 @@ bool VideoWidget::render(bool& showWindow)
     static bool lanczosEnabled = Config::cfg.video.lanczos;
     lanczosEnabled = _dx11.isLanczosEnabled();
 
-    if (ImGui::Checkbox("Lanczos Filter", &lanczosEnabled)) {
+    if (elCheckbox("Lanczos Filter", lanczosEnabled, "High-quality scaling filter applied when output resolution differs from native. Disable to send frames at native resolution.")) {
         _dx11.setLanczosEnabled(lanczosEnabled);
     }
-    TooltipWidget::render("High-quality scaling filter applied when output resolution differs from native.\nDisable to send frames at native resolution.");
+    //TooltipWidget::render("High-quality scaling filter applied when output resolution differs from native.\nDisable to send frames at native resolution.");
 
     // =========================================================
     // Bandwidth
