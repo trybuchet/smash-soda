@@ -1,7 +1,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <p align="center">
-  <img src="github/SmashSoda_icon_fill.png" style="width:200px;">
+  <img src="github/github_banner.png" style="width:200px;">
   <h3 align="center">Smash Soda</h3>
 
   <p align="center">
