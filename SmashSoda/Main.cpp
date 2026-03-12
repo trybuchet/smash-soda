@@ -14,6 +14,7 @@
 #include <Windows.h>
 #include <WinINet.h>
 #include <iostream>
+#include <cstdio>
 #include <string>
 #include <SDL.h>
 #include "resource.h"
@@ -64,6 +65,13 @@ static DWORD g_hookThreadId = 0;
 static HANDLE g_hookReadyEvent = NULL;
 static float g_uiScale = 1.0f;
 
+// Lightweight debug logging for window state transitions.
+static void DebugLogWindowMsg(const char* tag, WPARAM wParam, LPARAM lParam) {
+    char buf[160];
+    sprintf_s(buf, sizeof(buf), "[Wnd] %s wParam=0x%lX lParam=0x%lX\n", tag, static_cast<unsigned long>(wParam), static_cast<unsigned long>(lParam));
+    OutputDebugStringA(buf);
+}
+
 // Forward declarations of helper functions
 bool CreateDeviceD3D(HWND hWnd);
 void CleanupDeviceD3D();
@@ -77,6 +85,93 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam);
 
+// Persist window rectangle only when the window is actually visible (not minimized) to avoid bogus coords.
+static void PersistWindowRect(HWND hWnd, bool savePosition, bool saveSize) {
+    if (hWnd == nullptr) {
+        return;
+    }
+
+    WINDOWPLACEMENT placement = {};
+    placement.length = sizeof(WINDOWPLACEMENT);
+    if (!GetWindowPlacement(hWnd, &placement)) {
+        return;
+    }
+
+    // Windows reports -32000 coords when minimized; skip persisting in that state.
+    if (placement.showCmd == SW_SHOWMINIMIZED || IsIconic(hWnd)) {
+        return;
+    }
+
+    RECT windowRect = {};
+    if (!GetWindowRect(hWnd, &windowRect)) {
+        return;
+    }
+
+    constexpr LONG kMinWidth = 320;
+    constexpr LONG kMinHeight = 240;
+
+    if (savePosition) {
+        Config::cfg.video.windowX = windowRect.left;
+        Config::cfg.video.windowY = windowRect.top;
+    }
+
+    if (saveSize) {
+        const LONG width = windowRect.right - windowRect.left;
+        const LONG height = windowRect.bottom - windowRect.top;
+        Config::cfg.video.windowW = max(width, kMinWidth);
+        Config::cfg.video.windowH = max(height, kMinHeight);
+    }
+}
+
+// Ensure the loaded window rectangle is on-screen and reasonable before creating the window.
+static void SanitizeInitialWindowRect() {
+    constexpr LONG kMinWidth = 320;
+    constexpr LONG kMinHeight = 240;
+    constexpr LONG kDefaultWidth = 1280;
+    constexpr LONG kDefaultHeight = 720;
+
+    const LONG virtualLeft = GetSystemMetrics(SM_XVIRTUALSCREEN);
+    const LONG virtualTop = GetSystemMetrics(SM_YVIRTUALSCREEN);
+    const LONG virtualWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+    const LONG virtualHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+
+    LONG width = Config::cfg.video.windowW;
+    LONG height = Config::cfg.video.windowH;
+    if (width < kMinWidth) width = kDefaultWidth;
+    if (height < kMinHeight) height = kDefaultHeight;
+
+    // Clamp to available virtual screen size.
+    if (virtualWidth > 0) width = min(width, virtualWidth);
+    if (virtualHeight > 0) height = min(height, virtualHeight);
+
+    LONG x = Config::cfg.video.windowX;
+    LONG y = Config::cfg.video.windowY;
+
+    // Treat extreme negative coords (minimized) or off-screen values as invalid.
+    const bool invalidX = (x < virtualLeft - 1000) || (x > virtualLeft + virtualWidth - 50);
+    const bool invalidY = (y < virtualTop - 1000) || (y > virtualTop + virtualHeight - 50);
+
+    if (invalidX || invalidY || virtualWidth <= 0 || virtualHeight <= 0) {
+        x = virtualLeft + 50;
+        y = virtualTop + 50;
+    }
+
+    // Ensure the window stays within the virtual screen bounds with a small margin.
+    if (virtualWidth > 0) {
+        const LONG maxX = virtualLeft + virtualWidth - width;
+        x = max(virtualLeft, min(x, maxX));
+    }
+    if (virtualHeight > 0) {
+        const LONG maxY = virtualTop + virtualHeight - height;
+        y = max(virtualTop, min(y, maxY));
+    }
+
+    Config::cfg.video.windowX = x;
+    Config::cfg.video.windowY = y;
+    Config::cfg.video.windowW = width;
+    Config::cfg.video.windowH = height;
+}
+
 // Main code
 int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
 {
@@ -86,6 +181,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
 
     // Load config
     Config::cfg.Load();
+    SanitizeInitialWindowRect();
 
     WNDCLASSEX wc;
     wc.cbSize = sizeof(WNDCLASSEX);
@@ -590,31 +686,26 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
     {
     case WM_MOVE:
         if (g_hosting.mainWindow == hWnd) {
-			RECT windowRect;
-            if (GetWindowRect(hWnd, &windowRect))
-            {
-				Config::cfg.video.windowX = windowRect.left;
-				Config::cfg.video.windowY = windowRect.top;
-			}
-		}
-		break;
-    case WM_SIZE:
-        if (g_pd3dDevice != NULL && wParam != SIZE_MINIMIZED)
-        {
-            CleanupRenderTarget();
-            g_pSwapChain->ResizeBuffers(0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN, 0);
-            CreateRenderTarget();
+            PersistWindowRect(hWnd, /*savePosition=*/true, /*saveSize=*/false);
         }
-
+        break;
+    case WM_SIZE:
         if (g_hosting.mainWindow == hWnd) {
-			RECT windowRect;
-            if (GetWindowRect(hWnd, &windowRect))
+            DebugLogWindowMsg("WM_SIZE", wParam, lParam);
+        }
+        if (wParam != SIZE_MINIMIZED) {
+            if (g_pd3dDevice != NULL)
             {
-				Config::cfg.video.windowW = windowRect.right - windowRect.left;
-				Config::cfg.video.windowH = windowRect.bottom - windowRect.top;
-			}
-		}
-        return 0;
+                CleanupRenderTarget();
+                g_pSwapChain->ResizeBuffers(0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN, 0);
+                CreateRenderTarget();
+            }
+
+            if (g_hosting.mainWindow == hWnd && (wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED)) {
+                PersistWindowRect(hWnd, /*savePosition=*/true, /*saveSize=*/true);
+            }
+        }
+        break; // Let DefWindowProc handle final state changes.
     case WM_DPICHANGED:
         if (lParam != 0) {
             const RECT* suggestedRect = reinterpret_cast<RECT*>(lParam);
@@ -630,6 +721,19 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
         ApplyWindowDpiScale(hWnd);
         return 0;
     case WM_SYSCOMMAND:
+        if (g_hosting.mainWindow == hWnd) {
+            DebugLogWindowMsg("WM_SYSCOMMAND", wParam, lParam);
+        }
+        {
+            const UINT command = (wParam & 0xfff0);
+            if (command == SC_RESTORE) {
+                ShowWindow(hWnd, SW_RESTORE);
+                SetForegroundWindow(hWnd);
+                UpdateWindow(hWnd);
+                return 0; // Explicitly handled restore.
+            }
+        }
+
         if ((wParam & 0xfff0) == SC_KEYMENU) // Disable ALT application menu
             return 0;
         break;

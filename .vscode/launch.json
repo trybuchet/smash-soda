@@ -25,6 +25,18 @@
             "console": "integratedTerminal",
             "preLaunchTask": "cmake-build-release",
             "noDebug": true
+        },
+        {
+            "name": "SmashSoda Release (DebugConsole)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/x64/Release/SmashSoda.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/x64/Release",
+            "environment": [],
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "preLaunchTask": "cmake-build-release"
         }
     ]
 }
