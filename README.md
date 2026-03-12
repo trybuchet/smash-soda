@@ -82,7 +82,7 @@ You can build Smash Soda manually if you do not want to use the installer script
 - Git for Windows
 - CMake (3.18+), available on `PATH`
 - Visual Studio Build Tools with:
-  - Desktop development with C++
+  - Desktop development with C++ (with ATL for x64)
   - MSVC C++ toolset
   - Windows 10/11 SDK
 
