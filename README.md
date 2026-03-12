@@ -44,28 +44,28 @@ The Discord Server is the best place to get support quickly.
     <tr>
         <td align="center">
            <a href="https://github.com/soda-arcade/SmashSoda/releases">
-               <img src="https://raw.githubusercontent.com/soda-arcade/SmashSoda/master/github/Icons/download.png">
+               <img src="github/Icons/download.png">
                <div>Download</div>
            </a>
            <div>Download latest<br>version</div>
         </td>
         <td align="center">
            <a href="https://github.com/soda-arcade/SmashSoda/issues">
-               <img width="60px" src="https://raw.githubusercontent.com/soda-arcade/SmashSoda/master/github/Icons/fix.png">
+               <img width="60px" src="github/Icons/fix.png">
                <div>Issues</div>
            </a>
            <div>Report issues and<br>request features</div>
         </td>
         <td align="center">
            <a href="https://discord.gg/DsR9NubWYk">
-               <img width="60px" src="https://raw.githubusercontent.com/soda-arcade/SmashSoda/master/github/Icons/discord.png">
+               <img width="60px" src="github/Icons/discord.png">
                <div>Discord</div>
            </a>
            <div>Join the Discord<br>community!</div>
         </td>
         <td align="center">
            <a href="https://github.com/soda-arcade/SmashSoda/wiki">
-               <img width="60px" src="https://raw.githubusercontent.com/soda-arcade/SmashSoda/master/github/Icons/help.png">
+               <img width="60px" src="github/Icons/help.png">
                <div>Wiki</div>
            </a>
            <div>Read the full wiki<br>guide here!</div>
