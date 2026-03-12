@@ -1327,17 +1327,32 @@ void Hosting::pollInputs() {
 		if (ParsecHostPollInput(_parsec, 4, &inputGuest, &inputGuestMsg))
 		{
 			Guest guest;
-			if (GuestList::instance.find(inputGuest.userID, &guest)) {
-				if (inputGuestMsg.type == MESSAGE_KEYBOARD && !guest.allowKeyboardInput) {
+			bool hasGuest = GuestList::instance.find(inputGuest.userID, &guest);
+			bool allowKeyboard = inputGuest.perms.keyboard;
+			bool allowMouse = inputGuest.perms.mouse;
+
+			if (hasGuest) {
+				allowKeyboard = guest.allowKeyboardInput;
+				allowMouse = guest.allowMouseInput;
+			}
+
+			if ((inputGuestMsg.type == MESSAGE_MOUSE_BUTTON ||
+				inputGuestMsg.type == MESSAGE_MOUSE_WHEEL ||
+				inputGuestMsg.type == MESSAGE_MOUSE_MOTION) &&
+				!allowMouse) {
+				continue;
+			}
+
+			if (inputGuestMsg.type == MESSAGE_KEYBOARD) {
+				if (!allowKeyboard) {
+					if (!GamepadClient::instance.lock) {
+						GamepadClient::instance.sendMessage(inputGuest, inputGuestMsg);
+					}
 					continue;
 				}
 
-				if ((inputGuestMsg.type == MESSAGE_MOUSE_BUTTON ||
-					inputGuestMsg.type == MESSAGE_MOUSE_WHEEL ||
-					inputGuestMsg.type == MESSAGE_MOUSE_MOTION) &&
-					!guest.allowMouseInput) {
-					continue;
-				}
+				InputControlService::instance().handleParsecMessage(inputGuestMsg);
+				continue;
 			}
 
 			if (!GamepadClient::instance.lock)
