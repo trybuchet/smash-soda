@@ -112,6 +112,7 @@ void Config::Load() {
 			cfg.video.windowH = setValue(cfg.video.windowH, j["Video"]["windowH"].get<int>());
 			cfg.video.resolutionIndex = setValue(cfg.video.resolutionIndex, j["Video"]["resolutionIndex"].get<unsigned int>());
 			cfg.video.lanczos = setValue(cfg.video.lanczos, j["Video"]["lanczos"].get<bool>());
+			cfg.video.framePacing = setValue(cfg.video.framePacing, j["Video"].value("framePacing", true));
 			cfg.video.captureMethod = setValue(cfg.video.captureMethod, j["Video"]["captureMethod"].get<unsigned int>());
 			cfg.video.fps = setValue(cfg.video.fps, j["Video"]["fps"].get<unsigned int>());
 			cfg.video.bandwidth = setValue(cfg.video.bandwidth, j["Video"]["bandwidth"].get<unsigned int>());
@@ -368,6 +369,7 @@ void Config::Save() {
 		{"windowH", cfg.video.windowH},
 		{"resolutionIndex", cfg.video.resolutionIndex},
 		{"lanczos", cfg.video.lanczos},
+		{"framePacing", cfg.video.framePacing},
 		{"captureMethod", cfg.video.captureMethod},
 		{"fps", cfg.video.fps},
 		{"bandwidth", cfg.video.bandwidth}
