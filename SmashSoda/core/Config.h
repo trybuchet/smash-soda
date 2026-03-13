@@ -61,6 +61,7 @@ public:
 		int windowH = 720;
 		unsigned int resolutionIndex = 0;
 		bool lanczos = true;
+		bool framePacing = true;
 		unsigned int captureMethod = 0;
 		unsigned int fps = 60;
 		unsigned int bandwidth = 20;

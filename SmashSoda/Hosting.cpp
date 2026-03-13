@@ -3,6 +3,12 @@
 #include "services/InputControlService.h"
 #include "services/GuestStateStore.h"
 #include <deque>
+#include <thread>
+#include <chrono>
+#ifdef _WIN32
+#include <timeapi.h>
+#pragma comment(lib, "winmm.lib")
+#endif
 
 using namespace std;
 
@@ -881,9 +887,14 @@ void Hosting::liveStreamMedia() {
 	_mediaMutex.lock();
 	_isMediaThreadRunning = true;
 
-	static uint32_t sleepTimeMs = 4;
-	_mediaClock.setDuration(sleepTimeMs);
-	_mediaClock.start();
+#ifdef _WIN32
+	// High-resolution timer (1ms) so Sleep() and pacing are more accurate; reduces stutter
+	timeBeginPeriod(1);
+#endif
+
+	// Frame pacing: target one video capture per (1000/fps) ms for even frame delivery
+	const uint32_t minFps = 10;
+	const uint32_t maxFps = 240;
 
 	const uint32_t SAFE_FREQUENCY = 48000;
 	const size_t SUBMIT_CHUNK_FRAMES = static_cast<size_t>(SAFE_FREQUENCY / 100); // 10ms
@@ -948,6 +959,20 @@ void Hosting::liveStreamMedia() {
 
 	while (_isRunning)
 	{
+		const bool usePacing = Config::cfg.video.framePacing;
+		double frameIntervalSec = 0.0;
+		std::chrono::steady_clock::time_point frameStart;
+
+		if (usePacing) {
+			uint32_t targetFps = Config::cfg.video.fps;
+			if (targetFps < minFps) targetFps = minFps;
+			if (targetFps > maxFps) targetFps = maxFps;
+			frameIntervalSec = 1.0 / static_cast<double>(targetFps);
+			_mediaClock.setDuration(static_cast<uint32_t>(1000.0 * frameIntervalSec));
+			frameStart = std::chrono::steady_clock::now();
+		} else {
+			_mediaClock.setDuration(4);
+		}
 		_mediaClock.reset();
 
 		_dx11.captureScreen(_parsec);
@@ -1030,15 +1055,24 @@ void Hosting::liveStreamMedia() {
 		if (submittedChunks == 0) {
 			submitSilence();
 		}
-		
 
-		sleepTimeMs = _mediaClock.getRemainingTime();
-		if (sleepTimeMs > 0)
-		{
-			Sleep(sleepTimeMs);
+		// Sleep until next frame time for even pacing
+		if (usePacing && frameIntervalSec > 0.0) {
+			auto elapsed = std::chrono::steady_clock::now() - frameStart;
+			double elapsedSec = std::chrono::duration<double>(elapsed).count();
+			double remainingSec = frameIntervalSec - elapsedSec;
+			if (remainingSec > 0.001)
+				std::this_thread::sleep_for(std::chrono::duration<double>(remainingSec));
+		} else {
+			uint32_t sleepTimeMs = _mediaClock.getRemainingTime();
+			if (sleepTimeMs > 0)
+				Sleep(sleepTimeMs);
 		}
 	}
 
+#ifdef _WIN32
+	timeEndPeriod(1);
+#endif
 	_isMediaThreadRunning = false;
 	_mediaMutex.unlock();
 	_mediaThread.detach();

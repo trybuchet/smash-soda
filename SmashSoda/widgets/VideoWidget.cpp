@@ -119,6 +119,17 @@ bool VideoWidget::render(bool& showWindow)
     //TooltipWidget::render("High-quality scaling filter applied when output resolution differs from native.\nDisable to send frames at native resolution.");
 
     // =========================================================
+    // Frame rhythm
+    // =========================================================
+    static bool framePacingEnabled = Config::cfg.video.framePacing;
+    framePacingEnabled = Config::cfg.video.framePacing;
+
+    if (ImGui::Checkbox("Frame rhythm", &framePacingEnabled)) {
+        Config::cfg.video.framePacing = framePacingEnabled;
+        Config::cfg.Save();
+    }
+    TooltipWidget::render("Sends video frames at regular intervals (according to FPS). Reduces stutter for the client when enabled. Disable for legacy behavior (loop runs as fast as possible).");
+    // =========================================================
     // Bandwidth
     // =========================================================
     static int previousBandwidth;

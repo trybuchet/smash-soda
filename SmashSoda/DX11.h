@@ -73,6 +73,9 @@ private:
 	void releaseScaledRenderTarget();
 	ID3D11Texture2D* scaleTexture(ID3D11Texture2D* source);
 
+	void releaseLastSubmittedTexture();
+	bool ensureLastSubmittedTexture(UINT width, UINT height, DXGI_FORMAT format);
+
 	HMONITOR getMonitorHandle();
 	bool captureScreenWGC(ParsecDSO* ps);
 	bool captureScreenDupl(ParsecDSO* ps);
@@ -111,6 +114,12 @@ private:
 	ID3D11Buffer* _lanczosParamsCB = nullptr;
 	bool _scalingInitialized = false;
 	bool _lanczosEnabled = true;
+
+	// Repeat last frame when capture misses (keeps frame pacing even)
+	ID3D11Texture2D* _lastSubmittedTexture = nullptr;
+	UINT _lastSubmittedWidth = 0;
+	UINT _lastSubmittedHeight = 0;
+	DXGI_FORMAT _lastSubmittedFormat = DXGI_FORMAT_UNKNOWN;
 
 	// Windows Graphics Capture
 	CaptureMethod _captureMethod = CaptureMethod::Auto;

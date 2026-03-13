@@ -86,6 +86,7 @@ void DX11::clear()
 	SAFE_RELEASE(_deskDupl);
 	SAFE_RELEASE(_lAcquiredDesktopImage);
 	releaseScaledRenderTarget();
+	releaseLastSubmittedTexture();
 }
 
 void DX11::releaseScaledRenderTarget()
@@ -100,6 +101,41 @@ void DX11::releaseScaledRenderTarget()
 	SAFE_RELEASE(_vertexBuffer);
 	SAFE_RELEASE(_lanczosParamsCB);
 	_scalingInitialized = false;
+}
+
+void DX11::releaseLastSubmittedTexture()
+{
+	SAFE_RELEASE(_lastSubmittedTexture);
+	_lastSubmittedWidth = 0;
+	_lastSubmittedHeight = 0;
+	_lastSubmittedFormat = DXGI_FORMAT_UNKNOWN;
+}
+
+bool DX11::ensureLastSubmittedTexture(UINT width, UINT height, DXGI_FORMAT format)
+{
+	if (format == DXGI_FORMAT_UNKNOWN) return false;
+	if (_lastSubmittedTexture && _lastSubmittedWidth == width && _lastSubmittedHeight == height && _lastSubmittedFormat == format)
+		return true;
+	releaseLastSubmittedTexture();
+	if (!_device) return false;
+	D3D11_TEXTURE2D_DESC texDesc = {};
+	texDesc.Width = width;
+	texDesc.Height = height;
+	texDesc.MipLevels = 1;
+	texDesc.ArraySize = 1;
+	texDesc.Format = format;
+	texDesc.SampleDesc.Count = 1;
+	texDesc.SampleDesc.Quality = 0;
+	texDesc.Usage = D3D11_USAGE_DEFAULT;
+	texDesc.BindFlags = 0;
+	texDesc.CPUAccessFlags = 0;
+	texDesc.MiscFlags = 0;
+	HRESULT hr = _device->CreateTexture2D(&texDesc, nullptr, &_lastSubmittedTexture);
+	if (FAILED(hr)) return false;
+	_lastSubmittedWidth = width;
+	_lastSubmittedHeight = height;
+	_lastSubmittedFormat = format;
+	return true;
 }
 
 bool DX11::recover()
@@ -305,6 +341,12 @@ bool DX11::captureScreenWGC(ParsecDSO* ps)
 	ID3D11Texture2D* frame = _wgCapture.acquireFrame();
 	if (!frame)
 	{
+		if (_lastSubmittedTexture)
+		{
+			ParsecHostD3D11SubmitFrame(ps, 0, _device, _context, _lastSubmittedTexture);
+			_mutex.unlock();
+			return true;
+		}
 		_mutex.unlock();
 		return false;
 	}
@@ -321,7 +363,11 @@ bool DX11::captureScreenWGC(ParsecDSO* ps)
 		if (scaled) frameToSubmit = scaled;
 	}
 
+	D3D11_TEXTURE2D_DESC submitDesc;
+	frameToSubmit->GetDesc(&submitDesc);
 	ParsecHostD3D11SubmitFrame(ps, 0, _device, _context, frameToSubmit);
+	if (ensureLastSubmittedTexture(submitDesc.Width, submitDesc.Height, submitDesc.Format))
+		_context->CopyResource(_lastSubmittedTexture, frameToSubmit);
 
 	_mutex.unlock();
 	return true;
@@ -349,13 +395,17 @@ bool DX11::captureScreenDupl(ParsecDSO* ps)
 			lDesktopResource->Release();
 			_deskDupl->ReleaseFrame();
 		}
-
+		if (_lastSubmittedTexture)
+		{
+			ParsecHostD3D11SubmitFrame(ps, 0, _device, _context, _lastSubmittedTexture);
+			_mutex.unlock();
+			return true;
+		}
 		_mutex.unlock();
 		if (hr != DXGI_ERROR_WAIT_TIMEOUT)
 		{
 			clearAndRecover();
 		}
-
 		return false;
 	}
 
@@ -382,7 +432,11 @@ bool DX11::captureScreenDupl(ParsecDSO* ps)
 		}
 	}
 
+	D3D11_TEXTURE2D_DESC submitDesc;
+	frameToSubmit->GetDesc(&submitDesc);
 	ParsecHostD3D11SubmitFrame(ps, 0, _device, _context, frameToSubmit);
+	if (ensureLastSubmittedTexture(submitDesc.Width, submitDesc.Height, submitDesc.Format))
+		_context->CopyResource(_lastSubmittedTexture, frameToSubmit);
 
 	_deskDupl->ReleaseFrame();
 
