@@ -5,11 +5,20 @@
 #include <cctype>
 #include <Windows.h>
 #include "Config.h"
+#include "../PrivateConfig.h"
 
-// These are the sort of issues Parsec introduced when
-// they forbid me from providing builds... ¬_¬
-string Cache::_key = "SmashSodaKey***";
-string Cache::_nonce = "SmashSoda**";
+// These values come from the ignored, build-local PrivateConfig.h.
+string Cache::_key = SmashSodaBuildConfig::SessionEncryptionKey;
+string Cache::_nonce = SmashSodaBuildConfig::SessionEncryptionNonce;
+
+static_assert(sizeof(SmashSodaBuildConfig::Version) > 1, "Set Version in SmashSoda/PrivateConfig.h.");
+static_assert(sizeof(SmashSodaBuildConfig::ApiDomain) > 1, "Set ApiDomain in SmashSoda/PrivateConfig.h.");
+static_assert(sizeof(SmashSodaBuildConfig::ApiBasePath) > 1, "Set ApiBasePath in SmashSoda/PrivateConfig.h.");
+static_assert(sizeof(SmashSodaBuildConfig::ClientAppId) > 1, "Set ClientAppId in SmashSoda/PrivateConfig.h.");
+static_assert(sizeof(SmashSodaBuildConfig::ClientAppSecret) > 1, "Set ClientAppSecret in SmashSoda/PrivateConfig.h.");
+static_assert(sizeof(SmashSodaBuildConfig::SessionEncryptionKey) > 1, "Set SessionEncryptionKey in SmashSoda/PrivateConfig.h.");
+static_assert(sizeof(SmashSodaBuildConfig::SessionEncryptionNonce) > 1, "Set SessionEncryptionNonce in SmashSoda/PrivateConfig.h.");
+static_assert(sizeof(SmashSodaBuildConfig::ArcadeCredentialsEncryptionKey) > 1, "Set ArcadeCredentialsEncryptionKey in SmashSoda/PrivateConfig.h.");
 
 // Global cache object
 Cache Cache::cache = Cache();
@@ -32,8 +41,14 @@ namespace {
  */
 Cache::Cache() {
 
-	// Set the version
-	version = "7.0.4";
+    version = SmashSodaBuildConfig::Version;
+    apiDomain = SmashSodaBuildConfig::ApiDomain;
+    apiPort = SmashSodaBuildConfig::ApiPort;
+    apiSecure = SmashSodaBuildConfig::ApiSecure;
+    apiBasePath = SmashSodaBuildConfig::ApiBasePath;
+    clientAppId = SmashSodaBuildConfig::ClientAppId;
+    clientAppSecret = SmashSodaBuildConfig::ClientAppSecret;
+    arcadeCredentialsEncryptionKey = SmashSodaBuildConfig::ArcadeCredentialsEncryptionKey;
 
     // Load verified users
     vector<GuestData> verified = VerifiedList::LoadFromFile();

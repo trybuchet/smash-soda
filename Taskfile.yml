@@ -1,0 +1,162 @@
+version: '3'
+
+vars:
+  BUILD_DIR: '{{.TASKFILE_DIR}}/build'
+  BUILD_CONFIG: '{{.CONFIG | default "Release"}}'
+  ARCH: '{{.ARCH | default "x64"}}'
+
+tasks:
+  version:set:
+    summary: Updates the Smash Soda version in the example and local private config
+    cmds:
+      - node "{{.TASKFILE_DIR}}/setVersion.js" {{.CLI_ARGS}}
+    preconditions:
+      - sh: test -n "{{.CLI_ARGS}}"
+        msg: "Pass the new version after --, for example: task version:set -- 7.0.5"
+
+  credentials:local:issue:
+    summary: "Issues local API credentials for the Windows and Smash Soda builds (var: RELEASE)"
+    cmds:
+      - node "{{.TASKFILE_DIR}}/../../utils/clientCredentials.js" --source=local --mode=issue --platforms=windows {{if .RELEASE}}--release={{.RELEASE}}{{end}}
+
+  credentials:local:rotate:
+    summary: Rotates local API credentials for the Windows and Smash Soda builds
+    cmds:
+      - node "{{.TASKFILE_DIR}}/../../utils/clientCredentials.js" --source=local --mode=rotate --platforms=windows
+
+  credentials:staging:issue:
+    summary: Issues and caches first-party staging credentials for the maintainer build
+    cmds:
+      - node "{{.TASKFILE_DIR}}/../../utils/clientCredentials.js" --source=staging --mode=issue --apps=smash-soda
+
+  credentials:staging:rotate:
+    summary: Rotates the cached staging Smash Soda credentials
+    cmds:
+      - node "{{.TASKFILE_DIR}}/../../utils/clientCredentials.js" --source=staging --mode=rotate --apps=smash-soda
+
+  credentials:production:issue:
+    summary: Issues and caches production Smash Soda credentials
+    cmds:
+      - node "{{.TASKFILE_DIR}}/../../utils/clientCredentials.js" --source=production --mode=issue --apps=smash-soda
+
+  credentials:production:rotate:
+    summary: Rotates the cached production Smash Soda credentials
+    cmds:
+      - node "{{.TASKFILE_DIR}}/../../utils/clientCredentials.js" --source=production --mode=rotate --apps=smash-soda
+
+  credentials:import:
+    summary: "Caches the current header credentials (required var: SOURCE; optional: API_URL)"
+    cmds:
+      - node "{{.TASKFILE_DIR}}/../../utils/smashSodaCredentials.js" --mode=import "--source={{.SOURCE}}" {{if .API_URL}}"--api-url={{.API_URL}}"{{end}}
+
+  credentials:use:
+    summary: "Applies cached credentials and API endpoint (required var: SOURCE; optional: API_URL)"
+    cmds:
+      - node "{{.TASKFILE_DIR}}/../../utils/smashSodaCredentials.js" "--source={{.SOURCE}}" {{if .API_URL}}"--api-url={{.API_URL}}"{{end}}
+
+  setup:private-config:
+    summary: Creates the ignored local credentials and encryption config before building
+    platforms: [windows]
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File "{{.TASKFILE_DIR}}/SetupPrivateConfig.ps1"
+
+  configure:
+    summary: Configures the Smash Soda CMake project
+    platforms: [windows]
+    deps:
+      - task: setup:private-config
+    cmds:
+      - cmake -S "{{.TASKFILE_DIR}}" -B "{{.BUILD_DIR}}"
+
+  build:
+    summary: "Builds Smash Soda with cached credentials (var: SOURCE; default: production)"
+    platforms: [windows]
+    vars:
+      SOURCE: '{{.SOURCE | default "production"}}'
+      CONFIG: '{{.CONFIG | default "Release"}}'
+    cmds:
+      - task: credentials:use
+        vars:
+          SOURCE: '{{.SOURCE}}'
+          API_URL: '{{.API_URL | default ""}}'
+      - task: configure
+      - cmake --build "{{.BUILD_DIR}}" --config "{{.CONFIG}}" --parallel
+      - powershell -NoProfile -ExecutionPolicy Bypass -File "{{.TASKFILE_DIR}}/../../utils/smashSodaBuild.ps1" -Mode stage -Source "{{.SOURCE}}" -Configuration "{{.CONFIG}}" -Architecture "{{.ARCH}}"
+
+  build:dev:
+    summary: Builds and launches Smash Soda with local credentials and C++ debug symbols
+    platforms: [windows]
+    cmds:
+      - task: credentials:use
+        vars:
+          SOURCE: local
+          API_URL: '{{.API_URL | default ""}}'
+      - task: configure
+      - cmake --build "{{.BUILD_DIR}}" --config RelWithDebInfo --parallel
+      - powershell -NoProfile -ExecutionPolicy Bypass -File "{{.TASKFILE_DIR}}/../../utils/smashSodaBuild.ps1" -Mode stage -Source local -Configuration RelWithDebInfo -Architecture "{{.ARCH}}"
+      - powershell -NoProfile -Command "Set-Location -LiteralPath '{{.TASKFILE_DIR}}\..\..\bin\smash_soda\dev'; & '.\SmashSoda.exe'"
+
+  build:staging:
+    summary: Builds and launches Smash Soda with staging credentials and C++ debug symbols
+    platforms: [windows]
+    cmds:
+      - task: credentials:use
+        vars:
+          SOURCE: staging
+          API_URL: '{{.API_URL | default ""}}'
+      - task: configure
+      - cmake --build "{{.BUILD_DIR}}" --config RelWithDebInfo --parallel
+      - powershell -NoProfile -ExecutionPolicy Bypass -File "{{.TASKFILE_DIR}}/../../utils/smashSodaBuild.ps1" -Mode stage -Source staging -Configuration RelWithDebInfo -Architecture "{{.ARCH}}"
+      - powershell -NoProfile -Command "Set-Location -LiteralPath '{{.TASKFILE_DIR}}\..\..\bin\smash_soda\staging'; & '.\SmashSoda.exe'"
+
+  build:debug:
+    summary: Builds Smash Soda with local credentials and the full C++ Debug configuration
+    platforms: [windows]
+    cmds:
+      - task: credentials:use
+        vars:
+          SOURCE: local
+          API_URL: '{{.API_URL | default ""}}'
+      - task: configure
+      - cmake --build "{{.BUILD_DIR}}" --config Debug --parallel
+      - powershell -NoProfile -ExecutionPolicy Bypass -File "{{.TASKFILE_DIR}}/../../utils/smashSodaBuild.ps1" -Mode stage -Source local -Configuration Debug -Architecture "{{.ARCH}}"
+
+  zip:
+    summary: "Zips an existing portable build (SOURCE=local, staging, production)"
+    platforms: [windows]
+    vars:
+      SOURCE: '{{.SOURCE | default "production"}}'
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File "{{.TASKFILE_DIR}}/../../utils/smashSodaBuild.ps1" -Mode zip -Source "{{.SOURCE}}" -Architecture "{{.ARCH}}"
+
+  package:
+    summary: Builds and zips Smash Soda for the selected source without launching
+    platforms: [windows]
+    vars:
+      SOURCE: '{{.SOURCE | default "production"}}'
+    cmds:
+      - task: build
+        vars:
+          SOURCE: '{{.SOURCE}}'
+          CONFIG: '{{.CONFIG | default "Release"}}'
+          ARCH: '{{.ARCH}}'
+          API_URL: '{{.API_URL | default ""}}'
+      - task: zip
+        vars:
+          SOURCE: '{{.SOURCE}}'
+          ARCH: '{{.ARCH}}'
+
+  run:
+    summary: Runs the selected staged Smash Soda environment
+    platforms: [windows]
+    vars:
+      SOURCE: '{{.SOURCE | default "production"}}'
+      ENVIRONMENT: '{{if eq .SOURCE "local"}}dev{{else}}{{.SOURCE}}{{end}}'
+    cmds:
+      - powershell -NoProfile -Command "Set-Location -LiteralPath '{{.TASKFILE_DIR}}\..\..\bin\smash_soda\{{.ENVIRONMENT}}'; & '.\SmashSoda.exe'"
+
+  clean:
+    summary: Cleans the selected Smash Soda build configuration
+    platforms: [windows]
+    cmds:
+      - cmake --build "{{.BUILD_DIR}}" --config "{{.BUILD_CONFIG}}" --target clean

@@ -8,6 +8,7 @@ nav:
   - Getting Started:
     - Installation: getting-started/install.md
     - Manual Build (Windows): getting-started/manual-build.md
+    - Soda Arcade Developer Credentials: getting-started/developer-credentials.md
     - Overview: getting-started/overview.md
     - Quickstart: getting-started/quickstart.md
     - Development and Contributing: getting-started/development.md

@@ -25,7 +25,7 @@ bool LogWidget::render(bool& showWindow)
                 {
                     //AppStyle::pushNotice();
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 0.75f, 0.0f, 1.00f));
-                    ImGui::TextWrapped(_commandLog[i].substr(1).c_str());
+					ImGui::TextWrapped("%s", _commandLog[i].substr(1).c_str());
                     ImGui::PopStyleColor();
                     //AppStyle::pop();
                 }
@@ -33,13 +33,13 @@ bool LogWidget::render(bool& showWindow)
                 {
                     //AppStyle::pushNegative();
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 0.16f, 0.28f, 1.00f));
-                    ImGui::TextWrapped(_commandLog[i].substr(1).c_str());
+					ImGui::TextWrapped("%s", _commandLog[i].substr(1).c_str());
                     ImGui::PopStyleColor();
                     //AppStyle::pop();
                 }
                 else
                 {
-                    ImGui::TextWrapped(_commandLog[i].c_str());
+					ImGui::TextWrapped("%s", _commandLog[i].c_str());
                 }
             }
             if (_messageCount != _commandLog.size())

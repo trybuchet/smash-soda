@@ -50,6 +50,7 @@ Theme::Theme(const string& name, const json& theme)
     tab = hexToImVec4("#F2EEDDFF");
     tabText = hexToImVec4("#302E2BFF");
     tabHovered = hexToImVec4("#B5472EFF");
+    tabHoveredBackground = hexToImVec4("#CF5A3AFF");
     tabActive = hexToImVec4("#B04229FF");
     tabActiveText = hexToImVec4("#FFFFFFFF");
 
@@ -168,6 +169,7 @@ bool Theme::loadFromJSON(const json& theme) {
     setColor("tab", tab);
     setColor("tabText", tabText);
     setColor("tabHovered", tabHovered);
+    setColor("tabHoveredBackground", tabHoveredBackground);
     setColor("tabActive", tabActive);
     setColor("tabActiveText", tabActiveText);
 

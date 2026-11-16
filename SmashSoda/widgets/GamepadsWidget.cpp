@@ -10,6 +10,11 @@ GamepadsWidget::GamepadsWidget(Hosting& hosting)
 
 bool GamepadsWidget::render(bool& showWindow) {
 
+    float uiScale = ThemeController::getInstance().getUiScale();
+    if (uiScale <= 0.0f) {
+        uiScale = 1.0f;
+    }
+
     static int
     xboxCount = (int)Config::cfg.input.xboxPuppetCount,
     lastXboxCount = (int)Config::cfg.input.xboxPuppetCount,
@@ -106,7 +111,8 @@ bool GamepadsWidget::render(bool& showWindow) {
         AnimatedGamepadWidget* agw = agws[i];
         AGamepad* gi = _gamepads[i];
 
-        int height = (gi->isConnected() ? 120 : 74);
+        const float cardPaddingY = 3.0f;
+        int height = static_cast<int>((gi->isConnected() ? 120.0f : 74.0f) + cardPaddingY);
 
         std::string child = "##Gamepad " + to_string(i);
         size = ImGui::GetContentRegionAvail();
@@ -118,7 +124,7 @@ bool GamepadsWidget::render(bool& showWindow) {
             ImDrawList* drawList = ImGui::GetWindowDrawList();
             drawList->AddRectFilled(pos, ImVec2(pos.x + size.x - 20, pos.y + height), ImGui::ColorConvertFloat4ToU32(ImVec4(0, 0, 0, 0.1)), 8, ImDrawFlags_RoundCornersAll);
 
-            ImGui::Dummy(ImVec2(0, 5));
+            ImGui::Dummy(ImVec2(0, cardPaddingY));
             ImGui::Indent(10);
 
             renderPadInputTypeIcon(gi, i, refreshGamepads);

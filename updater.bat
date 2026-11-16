@@ -61,6 +61,8 @@ echo Install folder (script location): "%INSTALL_DIR%"
 set "WORK=%LOCALAPPDATA%\SmashSodaInstaller"
 set "SRC=%WORK%\src"
 set "BUILD=%WORK%\build"
+set "PRIVATE_CONFIG_BACKUP=%TEMP%\SmashSoda-PrivateConfig-%RANDOM%.h"
+if exist "%SRC%\smash-soda\SmashSoda\PrivateConfig.h" copy /y "%SRC%\smash-soda\SmashSoda\PrivateConfig.h" "%PRIVATE_CONFIG_BACKUP%" >nul
 set "OVERLAY_ZIP=%WORK%\smash-glass.zip"
 set "OVERLAY_EXTRACT=%WORK%\overlay-extract"
 set "VS_BOOTSTRAP=%WORK%\vs_BuildTools.exe"
@@ -401,6 +403,10 @@ if %errorlevel% neq 0 (
   pause
   exit /b 1
 )
+if exist "%PRIVATE_CONFIG_BACKUP%" (
+  copy /y "%PRIVATE_CONFIG_BACKUP%" "%SRC_DIR%\SmashSoda\PrivateConfig.h" >nul
+  del "%PRIVATE_CONFIG_BACKUP%"
+)
 set "DEPS_DIR=%SRC_DIR%\dependencies"
 if not exist "%DEPS_DIR%" set "DEPS_DIR=%SRC_DIR%\Dependencies"
 echo Source code cloned successfully.
@@ -408,6 +414,12 @@ echo Source code cloned successfully.
 :: --------- Build ----------
 echo.
 echo [5/7] Configuring CMake...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SRC_DIR%\SetupPrivateConfig.ps1"
+if %errorlevel% neq 0 (
+  echo ERROR: Local build credentials were not configured.
+  pause
+  exit /b 1
+)
 cmake -S "%SRC_DIR%" -B "%BUILD%" -A x64
 if %errorlevel% neq 0 (
   echo ERROR: CMake configuration failed

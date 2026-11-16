@@ -46,6 +46,7 @@
 #include "Widgets/DeveloperWidget.h"
 #include "Widgets/BackgroundWidget.h"
 #include "widgets/StreamingWidget.h"
+#include "widgets/ArcadeAccountWidget.h"
 #include "services/ThemeController.h"
 #include "services/ScreenshotService.h"
 #include "services/InputControlService.h"
@@ -267,6 +268,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
     DeveloperWidget developerWidget(g_hosting);
     BackgroundWidget backgroundWidget;
     StreamingWidget streamingWidget;
+    ArcadeAccountWidget arcadeAccountWidget;
 
     //ChatWidget chatWindow(g_hosting);
     KeyboardMapWidget keyMapWidget(g_hosting); //-- CodeSomnia Add Start--
@@ -332,6 +334,8 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
     //  Soda Arcade
     // =====================================================================
     if (Arcade::instance.loadCredentials()) {
+        // Validates the session, loads the account state and, once the account is
+        // fully set up, its artwork (so custom preview is ready in Host Settings).
         Arcade::instance.checkToken(Arcade::instance.credentials.token);
     }
 
@@ -402,6 +406,10 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
         else if (Config::cfg.arcade.showLogin) {
             versionWidget.renderLoginWindow();
         }
+        else if (Arcade::instance.showOnboarding) {
+            // Soda Arcade account setup (date of birth / updated Terms) before rooms can be listed.
+            arcadeAccountWidget.renderOnboarding();
+        }
         else
         {
             if (showHostSettings)       hostSettingsWindow.render(showHostSettings, hwnd);
@@ -420,6 +428,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In
             if (showHotseat)            hotseatWidget.render(showHotseat);
             if (showDevTools)           developerWidget.render(showDevTools);
 			if (showStream)             streamingWidget.render(showStream);
+            if (Arcade::instance.showHostingRules) arcadeAccountWidget.renderHostingRules();
 
             //-- CodeSomnia Add Start--
             if (showKeyMap)

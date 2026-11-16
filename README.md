@@ -82,9 +82,33 @@ You can build Smash Soda manually if you do not want to use the installer script
 - Git for Windows
 - CMake (3.18+), available on `PATH`
 - Visual Studio Build Tools with:
-  - Desktop development with C++ (with ATL for x64)
+  - Desktop development with C++
   - MSVC C++ toolset
   - Windows 10/11 SDK
+
+### Configure credentials
+
+Smash Soda uses private compile-time configuration. Before building, open
+PowerShell in the Smash Soda repository and run the command below. For your own
+source build, first create your own client ID and secret on Soda Arcade: see
+[Soda Arcade Developer Credentials](docs/content/getting-started/developer-credentials.md)
+for step-by-step instructions and the scopes to select.
+
+```powershell
+.\SetupPrivateConfig.ps1
+```
+
+The script creates `SmashSoda/PrivateConfig.h` from the tracked
+`SmashSoda/PrivateConfig.example.h` template if it does not exist. It generates
+local encryption values and prompts you for your Soda Arcade API client ID and client
+secret. The client secret prompt hides what you type.
+
+`PrivateConfig.h` is ignored by Git. Keep it private and do not commit it: its
+values are compiled into the executable. If you need to change the API endpoint
+or version, edit the corresponding settings in `SmashSoda/PrivateConfig.h`.
+The API host, port, secure connection setting, and base path are separate
+settings; enter the host without a scheme or path. A build will fail if the
+private header or required credentials and encryption values are missing.
 
 ### Build commands
 

@@ -29,8 +29,8 @@ void WebSocket::createServer(uint16_t port) {
             isRunning_ = true;
             g_hosting.logMessage("WebSocket server started.");
 
-            // Start overlay
-            if (Config::cfg.overlay.enabled) {
+            // Start overlay only while actively hosting.
+            if (Config::cfg.overlay.enabled && g_hosting.isRunning()) {
                 OverlayService::instance().start();
             }
 
@@ -49,9 +49,7 @@ void WebSocket::stopServer() {
     if (serverThread_.joinable()) {
         serverThread_.join();
     }
-    if (Config::cfg.overlay.enabled) {
-        OverlayService::instance().stop();
-    }
+    OverlayService::instance().stop();
     isRunning_ = false;
 }
 

@@ -15,19 +15,21 @@ bool TitleTooltipWidget::render(const char* title, const char* description, bool
 		ImGui::BeginTooltip();
 
 		ImGui::PushStyleColor(ImGuiCol_Text, theme->formLabel);
-		ImGui::Text(title);
+		ImGui::Text("%s", title != nullptr ? title : "");
 
 		ImGui::PushStyleColor(ImGuiCol_Text, theme->panelText);
-		ImGui::Text(description);
+		ImGui::Text("%s", description != nullptr ? description : "");
 
 		ImGui::EndTooltip();
 
 		ImGui::PopFont();
 		ImGui::PopStyleVar(2);
-		ImGui::PopStyleColor(2);
+		ImGui::PopStyleColor(4);
 
 		return true;
 	}
+
+	return false;
 }
 
 

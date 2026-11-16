@@ -49,7 +49,7 @@ bool ConfirmPopupWidget::render(const char* title, bool& showPopup, std::string 
 
             ImGui::PushFont(AppFonts::input);
             ImGui::PushStyleColor(ImGuiCol_Text, theme->formInputText);
-            ImGui::TextWrapped(textString.c_str());
+			ImGui::TextWrapped("%s", textString.c_str());
             ImGui::PopStyleColor();
             ImGui::PopFont();
         }

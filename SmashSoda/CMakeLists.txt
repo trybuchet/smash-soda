@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
-if(NOT CMAKE_HOST_WIN32)
+if(NOT WIN32)
     message(FATAL_ERROR "Smash Soda can only be built on Windows.")
 endif()
 
@@ -10,7 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # --------------------------
 # C++ settings
 # --------------------------
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 

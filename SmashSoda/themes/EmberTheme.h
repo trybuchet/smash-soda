@@ -30,6 +30,7 @@ public:
         tab = hexToImVec4("#F2EEDDFF");
         tabText = hexToImVec4("#302E2BFF");
         tabHovered = hexToImVec4("#B5472EFF");
+        tabHoveredBackground = hexToImVec4("#CF5A3AFF");
         tabActive = hexToImVec4("#B04229FF");
         tabActiveText = hexToImVec4("#FFFFFFFF");
 

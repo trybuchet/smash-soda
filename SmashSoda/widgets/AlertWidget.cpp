@@ -45,7 +45,7 @@ bool AlertWidget::render(const char * title, const char* message) {
 
         ImGui::PushFont(AppFonts::input);
         ImGui::PushStyleColor(ImGuiCol_Text, theme->formInputText);
-        ImGui::TextWrapped(message);
+		ImGui::TextWrapped("%s", message != nullptr ? message : "");
         ImGui::PopStyleColor();
         ImGui::PopFont();
 

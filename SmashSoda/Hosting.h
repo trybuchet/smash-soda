@@ -196,6 +196,7 @@ private:
 	bool _isLatencyThreadRunning = false;
 	bool _isSmashSodaThreadRunning = false;
 	bool _isGamepadThreadRunning = false;
+	std::chrono::steady_clock::time_point _lastSnapshotUpload = (std::chrono::steady_clock::time_point::min)();
 
 	Stopwatch _mediaClock;
 	Stopwatch _welcomeClock;
@@ -231,5 +232,4 @@ private:
 
 	const int _mickeyID = 1693946;
 };
-
 

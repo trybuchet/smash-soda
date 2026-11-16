@@ -45,7 +45,6 @@ void HostInfoWidget::renderArcade() {
 		ImGui::Image(AppIcons::arcadeIcon, ImVec2(48.0f * uiScale, 48.0f * uiScale));
 		ImGui::SameLine();
 
-		// Move cursor UP a bit
 		static ImVec2 cursor;
 		cursor = ImGui::GetCursorPos();
 		cursor.y -= 2.0f * uiScale;

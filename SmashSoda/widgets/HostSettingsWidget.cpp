@@ -73,13 +73,13 @@ bool HostSettingsWidget::validateSettings() {
 	// Clear previous errors
 	_roomNameError = "";
 
-	if (strlen(_roomName) > 255) {
-		_roomNameError = "Room name must be less than 255 characters.";
+    if (strlen(_roomName) > 50) {
+        _roomNameError = "Room name must be less than 50 characters.";
 		isValid = false;
 	}
 
-	if (strlen(_gameName) > 255) {
-		_validateError = "Game name must be less than 255 characters.";
+    if (strlen(_gameName) > 50) {
+        _validateError = "Game name must be less than 50 characters.";
         _showErrorPopup = true;
         ImGui::OpenPopup("ERROR");
 		return false;
@@ -147,23 +147,11 @@ bool HostSettingsWidget::render(bool& showWindow, HWND& hwnd) {
 
     }
 
-    // Room name + Game name is a feature of new Soda Arcade
-    // if (elText("Room Name", _roomName, "The name of your room. Must be between 3 and 255 characters.")) {
-    //     if (strlen(_roomName) > 50) {
-    //         string name = _roomName;
-    //         name = name.substr(0, 50);
-    //         strcpy_s(_roomName, name.c_str());
-    //     }
-    //     if (_hosting.isRunning()) {
-    //         _updated = true;
-    //     }
-    // }
-
-    if (elText("Room Name", _gameName, "Here you can tell people what game you're hosting. Max 255 characters.")) {
-        if (strlen(_gameName) > 50) {
-            string name = _gameName;
+    if (elText("Room Name", _roomName, "The public name of your Soda Arcade room. Max 50 characters.")) {
+        if (strlen(_roomName) > 50) {
+            string name = _roomName;
             name = name.substr(0, 50);
-            strcpy_s(_gameName, name.c_str());
+            strcpy_s(_roomName, name.c_str());
         }
         if (_hosting.isRunning()) {
             _updated = true;
@@ -202,6 +190,185 @@ bool HostSettingsWidget::render(bool& showWindow, HWND& hwnd) {
     }
 
     if (!Config::cfg.room.privateRoom) {
+        if (elText("Game", _gameName, "The game name sent to Soda Arcade. Max 50 characters.")) {
+            if (strlen(_gameName) > 50) {
+                string name = _gameName;
+                name = name.substr(0, 50);
+                strcpy_s(_gameName, name.c_str());
+            }
+            if (_hosting.isRunning()) {
+                _updated = true;
+            }
+        }
+
+        // Mature (18-rated) rooms are only shown to, and joinable by, confirmed adults on Soda Arcade.
+        const bool canHostMature = Arcade::instance.account.ageStatus == "adult";
+        // Only clear a saved setting once we know the account isn't an adult (not while it's still loading).
+        if (Arcade::instance.account.known && !canHostMature && Config::cfg.room.matureRoom) {
+            Config::cfg.room.matureRoom = false;
+        }
+        ImGui::BeginDisabled(!canHostMature);
+        if (elCheckbox(
+            "Mature Room (18+)",
+            Config::cfg.room.matureRoom,
+            canHostMature
+                ? "Tick this when you stream a game rated 18. Only users who have confirmed they're 18 or over can see or join your room on Soda Arcade."
+                : "Only confirmed adults can host mature rooms."
+        )) {
+            Config::cfg.Save();
+            if (_hosting.isRunning()) {
+                _updated = true;
+            }
+        }
+        ImGui::EndDisabled();
+
+        // Room thumbnail: the same choices as the Soda Arcade app's "Room Thumbnail" setting.
+        std::vector<std::pair<int, std::string>> previewTypeOptions = {
+            { 0, "Room Snapshot" },
+            { 1, "Game Cover Art" },
+            { 2, "Custom Artwork" }
+        };
+
+        int previewTypeIndex = 1;
+        if (Config::cfg.room.previewType == "snapshot") {
+            previewTypeIndex = 0;
+        }
+        else if (Config::cfg.room.previewType == "custom") {
+            previewTypeIndex = 2;
+        }
+
+        const char* previewHelp =
+            previewTypeIndex == 0 ? "Shows a snapshot of your stream, updated every 10 minutes while your room is public."
+            : previewTypeIndex == 1 ? "Shows the official cover art for the game above. If no cover is found, your room snapshot is shown instead."
+            : "Shows one of the images you've uploaded to Soda Arcade. Recommended size: 300x150 pixels.";
+
+        if (elRadio("Room Thumbnail", previewTypeOptions, previewTypeIndex, previewHelp)) {
+            Config::cfg.room.previewType = previewTypeIndex == 0 ? "snapshot" : previewTypeIndex == 2 ? "custom" : "auto";
+            // Fetch the artwork list again the next time Custom Artwork is shown.
+            _requestedCustomArtworkFetch = false;
+            Config::cfg.Save();
+            if (_hosting.isRunning()) {
+                _updated = true;
+            }
+        }
+
+        if (Config::cfg.room.previewType == "custom") {
+            Theme* theme = ThemeController::getInstance().getActiveTheme();
+
+            if (!Arcade::instance.isReady()) {
+                ImGui::PushStyleColor(ImGuiCol_Text, theme->warning);
+                ImGui::TextWrapped("Log in to Soda Arcade and finish setting up your account to use your artwork.");
+                ImGui::PopStyleColor();
+                ImGui::Dummy(ImVec2(0.0f, 10.0f));
+            }
+            else {
+                // Load the list once when this option is first shown (and on Refresh).
+                // getArtwork() refills the list in place, so it runs on this thread rather than in the background.
+                if (Arcade::instance.artwork.empty() && !_requestedCustomArtworkFetch) {
+                    Arcade::instance.getArtwork();
+                    _requestedCustomArtworkFetch = true;
+                }
+
+                if (Arcade::instance.artwork.empty()) {
+                    ImGui::PushStyleColor(ImGuiCol_Text, theme->warning);
+                    ImGui::TextWrapped("You haven't uploaded any artwork yet. Upload images in the Soda Arcade app (Create Room, Customize, Room Thumbnail, Custom Preview Image), then refresh. Until then your room uses Game Cover Art.");
+                    ImGui::PopStyleColor();
+                }
+                else {
+                    // Artwork options, with a placeholder until one is picked.
+                    std::vector<std::pair<std::string, std::string>> artworkOptions;
+                    artworkOptions.reserve(Arcade::instance.artwork.size() + 1);
+                    artworkOptions.push_back({ "", "Select..." });
+
+                    bool selectionFound = false;
+                    for (const auto& art : Arcade::instance.artwork) {
+                        artworkOptions.push_back({ std::to_string(art.id), art.title.empty() ? ("Artwork #" + std::to_string(art.id)) : art.title });
+                        if (art.id == Arcade::instance.artworkID) {
+                            selectionFound = true;
+                        }
+                    }
+
+                    // A previously chosen image that's been deleted or isn't approved any more.
+                    if (!selectionFound && Arcade::instance.artworkID != -1) {
+                        Arcade::instance.artworkID = -1;
+                        Config::cfg.room.artworkID = -1;
+                    }
+                    _selectedArtworkValue = selectionFound ? std::to_string(Arcade::instance.artworkID) : "";
+
+                    if (elSelect("Artwork", artworkOptions, _selectedArtworkValue)) {
+                        int selectedArtworkId = -1;
+                        if (!_selectedArtworkValue.empty()) {
+                            try {
+                                selectedArtworkId = std::stoi(_selectedArtworkValue);
+                            }
+                            catch (const std::exception&) {
+                                selectedArtworkId = -1;
+                            }
+                        }
+
+                        Arcade::instance.artworkID = selectedArtworkId;
+                        Config::cfg.room.artworkID = selectedArtworkId;
+                        _selectedArtwork = selectedArtworkId;
+                        Config::cfg.Save();
+
+                        if (_hosting.isRunning()) {
+                            _updated = true;
+                        }
+                    }
+
+                    if (Arcade::instance.artworkID <= 0) {
+                        ImGui::PushStyleColor(ImGuiCol_Text, theme->warning);
+                        ImGui::TextWrapped("Pick an image, or your room will use Game Cover Art.");
+                        ImGui::PopStyleColor();
+                    }
+                }
+
+                if (elBtnSecondary("Refresh artwork")) {
+                    Arcade::instance.getArtwork();
+                    _requestedCustomArtworkFetch = true;
+                }
+                ImGui::Dummy(ImVec2(0.0f, 10.0f));
+            }
+        }
+
+        // Tags multiselect
+        {
+            static const std::vector<std::pair<std::string, std::string>> tagOptions = {
+                {"Action","Action"},{"Adventure","Adventure"},{"Arcade","Arcade"},
+                {"Backseat Gamer","Backseat Gamer"},{"Battle Royale","Battle Royale"},
+                {"Beginner Friendly","Beginner Friendly"},{"Best of 2","Best of 2"},
+                {"Best of 3","Best of 3"},{"Best of 5","Best of 5"},
+                {"Double Elimination","Double Elimination"},{"Board Game","Board Game"},
+                {"Bullet Hell","Bullet Hell"},{"Card Game","Card Game"},{"Casual","Casual"},
+                {"Chat","Chat"},{"Co-op","Co-op"},{"Competitive","Competitive"},
+                {"Educational","Educational"},{"Fighting","Fighting"},
+                {"First Person Shooter","First Person Shooter"},{"Hotseat","Hotseat"},
+                {"Horror","Horror"},{"Idle","Idle"},{"Indie","Indie"},
+                {"King of the Hill","King of the Hill"},{"Metroidvania","Metroidvania"},
+                {"MMO","MMO"},{"MOBA","MOBA"},{"Multiplayer","Multiplayer"},
+                {"Music","Music"},{"Open World","Open World"},{"Party Game","Party Game"},
+                {"Platform Fighter","Platform Fighter"},{"Platformer","Platformer"},
+                {"Puzzle","Puzzle"},{"Racing","Racing"},{"Retro","Retro"},
+                {"Rhythm","Rhythm"},{"Role-Playing Game","Role-Playing Game"},
+                {"Roguelike","Roguelike"},{"Sandbox","Sandbox"},{"Shooter","Shooter"},
+                {"Side-scroller","Side-scroller"},{"Simulation","Simulation"},
+                {"Single Elimination","Single Elimination"},{"Single Player","Single Player"},
+                {"Sports","Sports"},{"Stealth","Stealth"},{"Strategy","Strategy"},
+                {"Survival","Survival"},{"Swiss","Swiss"},
+                {"Third Person Shooter","Third Person Shooter"},{"Tournament","Tournament"},
+                {"Tower Defense","Tower Defense"},{"Trivia","Trivia"},
+                {"Turn-based","Turn-based"},{"Twin Stick Shooter","Twin Stick Shooter"},
+                {"Variety","Variety"},{"Visual Novel","Visual Novel"}
+            };
+
+            if (elMultiSelect("Tags", tagOptions, Config::cfg.room.tags, SIZE_MAX,
+                "Add tags to help players find your room on Soda Arcade.")) {
+                if (_hosting.isRunning()) {
+                    _updated = true;
+                }
+            }
+        }
+
         if (elText("Stream URL", _streamUrl, "If you're streaming on Twitch.tv, you can add your Twitch stream URL here to have it appear on Soda Arcade. Max 255 characters.")) {
             if (_hosting.isRunning()) {
                 _updated = true;
@@ -209,70 +376,6 @@ bool HostSettingsWidget::render(bool& showWindow, HWND& hwnd) {
         }
 
         if (elTextArea("Room Details", _description, "Optional room details shown on Soda Arcade. Max 500 characters.")) {
-            if (_hosting.isRunning()) {
-                _updated = true;
-            }
-        }
-    }
-
-    const bool isArcadeAuthenticated = !Arcade::instance.credentials.token.empty();
-    if (isArcadeAuthenticated && !Config::cfg.room.privateRoom && !Arcade::instance.artwork.empty()) {
-        std::vector<std::pair<std::string, std::string>> artworkOptions;
-        artworkOptions.reserve(Arcade::instance.artwork.size() + 1);
-        artworkOptions.push_back({ "-1", "None" });
-
-        int selectedIndex = -1;
-        for (size_t i = 0; i < Arcade::instance.artwork.size(); ++i) {
-            const auto& art = Arcade::instance.artwork[i];
-            artworkOptions.push_back({ std::to_string(art.id), art.title });
-
-            if (art.id == Arcade::instance.artworkID) {
-                selectedIndex = static_cast<int>(i);
-            }
-        }
-
-        _selectedArtwork = selectedIndex;
-        _selectedArtworkValue = std::to_string(Arcade::instance.artworkID);
-        bool selectedValueValid = false;
-        for (const auto& option : artworkOptions) {
-            if (option.first == _selectedArtworkValue) {
-                selectedValueValid = true;
-                break;
-            }
-        }
-        if (!selectedValueValid) {
-            _selectedArtwork = -1;
-            _selectedArtworkValue = "-1";
-            Arcade::instance.artworkID = -1;
-            Config::cfg.room.artworkID = -1;
-        }
-
-        if (elSelect(
-            "Custom Artwork",
-            artworkOptions,
-            _selectedArtworkValue,
-            "If you have any custom artwork uploaded to Soda Arcade, you can select it here."
-        )) {
-            int selectedArtworkId = -1;
-            try {
-                selectedArtworkId = std::stoi(_selectedArtworkValue);
-            }
-            catch (const std::exception&) {
-                selectedArtworkId = -1;
-                _selectedArtworkValue = "-1";
-            }
-
-            Arcade::instance.artworkID = selectedArtworkId;
-            Config::cfg.room.artworkID = selectedArtworkId;
-
-            _selectedArtwork = -1;
-            for (size_t i = 0; i < Arcade::instance.artwork.size(); ++i) {
-                if (Arcade::instance.artwork[i].id == selectedArtworkId) {
-                    _selectedArtwork = static_cast<int>(i);
-                    break;
-                }
-            }
-
             if (_hosting.isRunning()) {
                 _updated = true;
             }
@@ -304,6 +407,10 @@ bool HostSettingsWidget::render(bool& showWindow, HWND& hwnd) {
             else {
                 OverlayService::instance().stop();
             }
+        }
+        else if (!Config::cfg.overlay.enabled) {
+            // If overlay is active for any reason while not hosting, close it.
+            OverlayService::instance().stop();
         }
     }
 

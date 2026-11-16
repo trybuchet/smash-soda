@@ -45,7 +45,15 @@ public:
     static Cache cache;
     Update update; // Update information
 
-    string version = "5.1.0"; // Current version of Smash Soda
+    // Build configuration shared by the app and its API service.
+    string version;
+    string apiDomain;
+    uint16_t apiPort = 0;
+    bool apiSecure = true;
+    string apiBasePath;
+    string clientAppId;
+    string clientAppSecret;
+    string arcadeCredentialsEncryptionKey;
 
     VerifiedList verifiedList; // List of verified users
     BanList banList; // List of banned users

@@ -66,13 +66,21 @@ public:
         const std::string& label,
         const std::vector<std::pair<std::string, std::string>>& options,
         std::vector<std::string>& selectedValues,
-        size_t limit,
-        const std::string& help,
-        const std::string& error
+        size_t limit = SIZE_MAX,
+        const std::string& help = "",
+        const std::string& error = ""
     );
 
     bool elTextArea(std::string label, char* buffer, std::string help = "", std::string error = "");
     bool elCheckbox(std::string label, bool& isOn, std::string help = "", std::string error = "");
+    // Renders a radio group where each option maps to an integer selection value.
+    bool elRadio(
+        std::string label,
+        const std::vector<std::pair<int, std::string>>& options,
+        int& selectedValue,
+        std::string help = "",
+        std::string error = ""
+    );
     bool elNumber(std::string label, int& value, int from, int to, std::string help = "", std::string error = "");
 
     static bool elBtn(std::string label);

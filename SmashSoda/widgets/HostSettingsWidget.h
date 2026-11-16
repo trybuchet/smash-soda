@@ -72,6 +72,7 @@ private:
 	int32_t _latencyLimit;
 	int _selectedArtwork = -1;
 	string _selectedArtworkValue = "-1";
+	bool _requestedCustomArtworkFetch = false;
 	size_t _selectedTheme = 0;
 	size_t _selectedCategory = 0;
 

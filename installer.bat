@@ -265,55 +265,18 @@ if "%STEP_INSTALL_BUILD_TOOLS%"=="0" (
 )
 
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
-set "VS_INSTALLER=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\setup.exe"
 set "VSINSTALL="
-set "VSINSTALL_COMPLETE="
 
-set "VS_ADDS=--add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --add Microsoft.VisualStudio.Component.VC.ATL --add Microsoft.VisualStudio.Component.Windows11SDK.22621 --includeRecommended"
-
+:: Initial detection
 if exist "%VSWHERE%" (
   for /f "usebackq tokens=*" %%i in (`
     "%VSWHERE%" -latest -products * ^
-    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.ATL ^
+    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 ^
     -property installationPath
-  `) do set "VSINSTALL_COMPLETE=%%i"
-  for /f "usebackq tokens=*" %%i in (`
-    "%VSWHERE%" -latest -products * -property installationPath
   `) do set "VSINSTALL=%%i"
 )
 
-if defined VSINSTALL_COMPLETE (
-  set "VSINSTALL=!VSINSTALL_COMPLETE!"
-  echo Existing Visual Studio C++ toolchain with ATL detected. Skipping install.
-  goto :vs_ready
-)
-if defined VSINSTALL goto :vs_modify
-goto :vs_fresh_install
-
-:vs_modify
-echo.
-echo A Visual Studio install was found, but it is missing C++ components
-echo required to build Smash Soda (for example ATL). Adding them to the
-echo existing install. This may take several minutes. Please wait...
-echo "%VSINSTALL%"
-if not exist "%VS_INSTALLER%" (
-  echo WARNING: Visual Studio Installer not found at:
-  echo "%VS_INSTALLER%"
-  echo Cannot add the missing components automatically. If the build fails,
-  echo open the Visual Studio Installer, choose Modify, and add
-  echo "C++ ATL for latest build tools".
-  goto :vs_ready
-)
-"%VS_INSTALLER%" modify --installPath "%VSINSTALL%" --quiet --norestart %VS_ADDS%
-set "VS_MODIFY_RC=!errorlevel!"
-if not "!VS_MODIFY_RC!"=="0" if not "!VS_MODIFY_RC!"=="3010" (
-  echo WARNING: Visual Studio modify failed with exit code !VS_MODIFY_RC!.
-  echo If the build fails on missing ATL headers, open the Visual Studio
-  echo Installer, choose Modify, and add "C++ ATL for latest build tools".
-)
-goto :vs_ready
-
-:vs_fresh_install
+if not defined VSINSTALL (
   echo Visual Studio Build Tools not found. Installing...
   echo This will take several minutes. Please wait...
   echo.
@@ -322,7 +285,7 @@ goto :vs_ready
   if %errorlevel% equ 0 (
     echo Using winget to install Visual Studio Build Tools 2026 with ATL support...
     winget install -e --id Microsoft.VisualStudio.BuildTools ^
-      --override "--wait --quiet --norestart %VS_ADDS%"
+      --override "--wait --quiet --norestart --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --add Microsoft.VisualStudio.Component.VC.ATL --add Microsoft.VisualStudio.Component.Windows11SDK.22621 --includeRecommended"
     set "WINGET_RC=!errorlevel!"
     if not "!WINGET_RC!"=="0" if not "!WINGET_RC!"=="3010" (
       echo WARNING: winget install failed with exit code !WINGET_RC!.
@@ -335,7 +298,12 @@ goto :vs_ready
       )
 
       echo Running Visual Studio Build Tools installer with ATL support...
-      "%VS_BOOTSTRAP%" --wait --quiet --norestart %VS_ADDS%
+      "%VS_BOOTSTRAP%" --wait --quiet --norestart ^
+        --add Microsoft.VisualStudio.Workload.VCTools ^
+        --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 ^
+        --add Microsoft.VisualStudio.Component.VC.ATL ^
+        --add Microsoft.VisualStudio.Component.Windows11SDK.22621 ^
+        --includeRecommended
       set "VSBT_RC=!errorlevel!"
       if not "!VSBT_RC!"=="0" if not "!VSBT_RC!"=="3010" (
         echo ERROR: Visual Studio Build Tools installer failed with exit code !VSBT_RC!.
@@ -353,7 +321,12 @@ goto :vs_ready
     )
     
     echo Running Visual Studio Build Tools installer with ATL support...
-    "%VS_BOOTSTRAP%" --wait --quiet --norestart %VS_ADDS%
+    "%VS_BOOTSTRAP%" --wait --quiet --norestart ^
+      --add Microsoft.VisualStudio.Workload.VCTools ^
+      --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 ^
+      --add Microsoft.VisualStudio.Component.VC.ATL ^
+      --add Microsoft.VisualStudio.Component.Windows11SDK.22621 ^
+      --includeRecommended
     set "VSBT_RC=!errorlevel!"
     if not "!VSBT_RC!"=="0" if not "!VSBT_RC!"=="3010" (
       echo ERROR: Visual Studio Build Tools installer failed with exit code !VSBT_RC!.
@@ -382,15 +355,13 @@ goto :vs_ready
   if exist "%VSWHERE%" (
     for /f "usebackq tokens=*" %%i in (`
       "%VSWHERE%" -latest -products * ^
-      -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.ATL ^
+      -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 ^
       -property installationPath
     `) do set "VSINSTALL=%%i"
   )
 
   if not defined VSINSTALL goto wait_vs
-goto :vs_ready
-
-:vs_ready
+)
 
 echo.
 echo Visual Studio Build Tools detected at:
@@ -419,49 +390,65 @@ echo C++ build environment is ready.
 :: --------- Install CMake ----------
 echo.
 echo [3/8] Installing CMake...
-:: Use the native Windows (Kitware) CMake via its full path. never a PATH "cmake",
-:: which may be an MSYS2/MinGW build (Unix Makefiles, no VS generator => build fails).
-set "CMAKE_EXE=%ProgramFiles%\CMake\bin\cmake.exe"
 if "%STEP_INSTALL_CMAKE%"=="0" (
   echo Skipped [3/8] Install CMake.
   goto :after_install_cmake
 )
-:: 1) Try winget first if it is available (fast).
-if not exist "%CMAKE_EXE%" (
+where cmake >nul 2>&1
+if %errorlevel% neq 0 (
   where winget >nul 2>&1
-  if !errorlevel! equ 0 (
+  if %errorlevel% equ 0 (
     echo Using winget to install CMake...
     winget install -e --id Kitware.CMake --silent --accept-package-agreements --accept-source-agreements
+    set "WINGET_CMAKE_RC=!errorlevel!"
+    if not "!WINGET_CMAKE_RC!"=="0" if not "!WINGET_CMAKE_RC!"=="3010" (
+      echo WARNING: winget CMake install failed with exit code !WINGET_CMAKE_RC!.
+      echo Falling back to direct CMake installer download...
+      call :download_latest_github_asset "Kitware/CMake" "^cmake-.*-windows-x86_64\.msi$" "%CMAKE_SETUP%" "CMake"
+      if errorlevel 1 (
+        echo ERROR: Failed to download CMake installer.
+        pause
+        exit /b 1
+      )
+      msiexec /i "%CMAKE_SETUP%" /qn /norestart ADD_CMAKE_TO_PATH=System
+      if errorlevel 1 (
+        echo ERROR: CMake installer failed.
+        pause
+        exit /b 1
+      )
+    )
+    timeout /t 5 >nul
+  ) else (
+    echo winget not found. Falling back to direct CMake installer download...
+    call :download_latest_github_asset "Kitware/CMake" "^cmake-.*-windows-x86_64\.msi$" "%CMAKE_SETUP%" "CMake"
+    if errorlevel 1 (
+      echo ERROR: Failed to download CMake installer.
+      pause
+      exit /b 1
+    )
+    msiexec /i "%CMAKE_SETUP%" /qn /norestart ADD_CMAKE_TO_PATH=System
+    if errorlevel 1 (
+      echo ERROR: CMake installer failed.
+      pause
+      exit /b 1
+    )
     timeout /t 5 >nul
   )
 )
 
-:: 2) If the native CMake still is not at the expected path (no winget, winget failed,
-::    or it was installed elsewhere), download Kitware's MSI and install it there.
-if not exist "%CMAKE_EXE%" (
-  echo Downloading CMake directly from Kitware...
-  call :download_latest_github_asset "Kitware/CMake" "^cmake-.*-windows-x86_64\.msi$" "%CMAKE_SETUP%" "CMake"
-  if errorlevel 1 (
-    echo ERROR: Failed to download CMake installer.
-    pause
-    exit /b 1
-  )
-  msiexec /i "%CMAKE_SETUP%" /qn /norestart ADD_CMAKE_TO_PATH=System
-  if errorlevel 1 (
-    echo ERROR: CMake installer failed.
-    pause
-    exit /b 1
-  )
-  timeout /t 5 >nul
+:: Add CMake to PATH manually if needed
+if exist "%ProgramFiles%\CMake\bin\cmake.exe" (
+  set "PATH=%ProgramFiles%\CMake\bin;%PATH%"
 )
 
-if not exist "%CMAKE_EXE%" (
-  echo ERROR: Native CMake not found at "%CMAKE_EXE%" after installation.
-  echo Please install CMake from https://cmake.org/download/ and re-run.
+:: Verify CMake
+where cmake >nul 2>&1
+if %errorlevel% neq 0 (
+  echo ERROR: CMake not found after installation
   pause
   exit /b 1
 )
-echo CMake is ready: "%CMAKE_EXE%"
+echo CMake is ready.
 :after_install_cmake
 
 :: --------- ViGEmBus driver ----------
@@ -516,7 +503,13 @@ if "%STEP_BUILD%"=="0" (
   echo Skipped [6/8] Configure and [7/8] Build.
   goto :after_build
 )
-"%CMAKE_EXE%" -S "%SRC_DIR%" -B "%BUILD%" -A x64
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SRC_DIR%\SetupPrivateConfig.ps1"
+if %errorlevel% neq 0 (
+  echo ERROR: Local build credentials were not configured.
+  pause
+  exit /b 1
+)
+cmake -S "%SRC_DIR%" -B "%BUILD%" -A x64
 if %errorlevel% neq 0 (
   echo ERROR: CMake configuration failed
   pause
@@ -525,12 +518,12 @@ if %errorlevel% neq 0 (
 
 echo.
 echo CMake generator info:
-"%CMAKE_EXE%" -LA -N "%BUILD%" | findstr /C:"CMAKE_GENERATOR"
+cmake -LA -N "%BUILD%" | findstr /C:"CMAKE_GENERATOR"
 
 echo.
 echo [7/8] Building Release...
 mkdir "%SRC_DIR%\x64\release" 2>nul
-"%CMAKE_EXE%" --build "%BUILD%" --config Release
+cmake --build "%BUILD%" --config Release
 if %errorlevel% neq 0 (
   echo ERROR: Build failed
   pause

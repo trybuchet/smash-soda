@@ -1,15 +1,22 @@
 cmake_minimum_required(VERSION 3.18)
 
 # Make sure we are on Windows
-if(NOT CMAKE_HOST_WIN32)
+if(NOT WIN32)
     message(FATAL_ERROR "Smash Soda can only be built on Windows.")
 endif()
 
 project(SmashSoda LANGUAGES CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/SmashSoda/PrivateConfig.h")
+    message(FATAL_ERROR
+        "Smash Soda requires local build credentials. Copy "
+        "SmashSoda/PrivateConfig.example.h to SmashSoda/PrivateConfig.h "
+        "or run SetupPrivateConfig.ps1, then fill in your Soda Arcade API client ID and secret.")
+endif()
+
 # Force C++17 (matching the subdirectory requirement)
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Detect architecture for output directories

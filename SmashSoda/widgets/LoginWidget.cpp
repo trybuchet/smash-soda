@@ -267,7 +267,7 @@ void LoginWidget::renderSodaArcadeLogin() {
             elParagraph("Soda Arcade is a free service for advertising your Parsec room. You will need to create a account to use this service.");
         } else {
 			ImGui::PushStyleColor(ImGuiCol_Text, theme->negative);
-			ImGui::TextWrapped(sodaArcadeError.c_str());
+			ImGui::TextWrapped("%s", sodaArcadeError.c_str());
             ImGui::PopStyleColor();
             ImGui::Dummy(ImVec2(0, 10.0f * uiScale));
 		}
@@ -312,7 +312,7 @@ void LoginWidget::renderSodaArcadeLogin() {
                         Config::cfg.arcade.showLogin = false;
                         Config::cfg.Save();
                     } else {
-                        sodaArcadeError = "Invalid e-mail or password.";
+                        sodaArcadeError = Arcade::instance.error;
                         _showError = true;
                     }
 

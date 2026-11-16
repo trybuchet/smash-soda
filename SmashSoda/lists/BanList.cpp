@@ -84,10 +84,20 @@ vector<GuestData> BanList::LoadFromFile() {
 
         if (MTY_FileExists(filepath.c_str())) {
             MTY_JSON* json = MTY_JSONReadFile(filepath.c_str());
+
+            // Corrupt or unreadable files can exist on user machines; skip them safely.
+            if (json == nullptr) {
+                MTY_JSONDestroy(&json);
+                return result;
+            }
+
             uint32_t size = MTY_JSONGetLength(json);
 
             for (size_t i = 0; i < size; i++) {
                 const MTY_JSON* guest = MTY_JSONArrayGetItem(json, (uint32_t)i);
+                if (guest == nullptr) {
+                    continue;
+                }
 
                 char name[128] = "";
                 uint32_t userID = 0;
@@ -105,7 +115,7 @@ vector<GuestData> BanList::LoadFromFile() {
                 }
             }
 
-            std::sort(result.begin(), result.end(), [](const GuestData a, const GuestData b) {
+            std::sort(result.begin(), result.end(), [](const GuestData& a, const GuestData& b) {
                 return a.userID < b.userID;
             });
 

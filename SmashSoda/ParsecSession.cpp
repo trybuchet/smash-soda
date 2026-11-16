@@ -26,6 +26,10 @@ bool ParsecSession::loadSessionCache()
 
 bool ParsecSession::deleteSessionCache() {
 	bool success = Cache::deleteSessionCache();
+	sessionId.clear();
+	hostPeerId.clear();
+	_start = 0;
+	_expiry = 0;
 	_isValid = false;
 	Cache::cache.showParsecLogin = true;
 	return success;
@@ -419,6 +423,7 @@ void ParsecSession::fetchAccountDataSync(Guest* user)
 		user->userID = 0;
 		user->status = Guest::Status::EXPIRED;
 		_isValid = false;
+		deleteSessionCache();
 	}
 
 	_isUpdating = false;

@@ -61,8 +61,8 @@ public:
 		int windowH = 720;
 		unsigned int resolutionIndex = 0;
 		bool lanczos = true;
-		bool framePacing = true;
-		unsigned int captureMethod = 0;
+		// 1 = DXGI Duplication
+		unsigned int captureMethod = 1;
 		unsigned int fps = 60;
 		unsigned int bandwidth = 20;
 	};
@@ -92,8 +92,10 @@ public:
 		string name = "";
 		string game = "";
 		bool privateRoom = false;
+		bool matureRoom = false;	// Listed on Soda Arcade as mature (18-rated); adults only
 		unsigned int guestLimit = 1;
 		int artworkID = -1;
+		string previewType = "auto";
 		bool isValid = false;
 		string secret = "";
 		bool latencyLimit = false;
@@ -101,6 +103,7 @@ public:
 		string streamUrl = "";
 		unsigned int repThreshold = 70;
 		bool anonymous = true;
+		std::vector<std::string> tags;
 	};
 	
 	class Chat {

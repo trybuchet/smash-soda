@@ -1,4 +1,5 @@
 #include "Widget.h"
+#include "../imgui/imgui_internal.h"
 #include <algorithm>
 
 namespace {
@@ -177,12 +178,28 @@ void Widget::startTabs(const std::vector<Tab>& tabs, bool footer) {
             ImGui::PushStyleColor(ImGuiCol_Text, theme->buttonPrimaryText);
         } else {
             ImGui::PushStyleColor(ImGuiCol_Button, theme->buttonSecondary);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme->buttonSecondaryHovered);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme->tabHoveredBackground);
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, theme->buttonSecondaryActive);
             ImGui::PushStyleColor(ImGuiCol_Text, theme->buttonSecondaryText);
         }
 
-        if (ImGui::BeginTabItem(tabs[i].name)) {
+        const bool tabOpen = ImGui::BeginTabItem(tabs[i].name);
+        const bool tabHovered = ImGui::IsItemHovered();
+
+        if (tabHovered) {
+            // Draw hovered tab text in white without forcing all tab labels to white.
+            const ImVec2 tabMin = ImGui::GetItemRectMin();
+            const ImVec2 tabMax = ImGui::GetItemRectMax();
+            const ImVec2 tabSize(tabMax.x - tabMin.x, tabMax.y - tabMin.y);
+            const ImVec2 textSize = ImGui::CalcTextSize(tabs[i].name);
+            const ImVec2 textPos(
+                tabMin.x + (tabSize.x - textSize.x) * 0.5f,
+                tabMin.y + (tabSize.y - textSize.y) * 0.5f
+            );
+            drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), tabs[i].name);
+        }
+
+        if (tabOpen) {
             activeTab = i;
             const float seamOffset = ImGui::GetStyle().ItemSpacing.y;
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() - seamOffset);
@@ -298,7 +315,13 @@ void Widget::endWidget() {
     isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || isPopupOpen;
 	ImGui::End();
     ImGui::PopFont();
-    ImGui::PopStyleColor(9);
+    // Defensive: only pop as many colors as are actually on the stack (some inner widget may
+    // have left the global ImGui color stack imbalanced). Avoids access violations in Release.
+    ImGuiContext* ctx = ImGui::GetCurrentContext();
+    int toPop = (ctx && ctx->ColorStack.Size < 9) ? ctx->ColorStack.Size : 9;
+    if (toPop > 0) {
+        ImGui::PopStyleColor(toPop);
+    }
 }
 
 void Widget::elLabel(std::string label) {
@@ -308,7 +331,7 @@ void Widget::elLabel(std::string label) {
     ImGui::PushFont(AppFonts::label);
     ImGui::PushStyleColor(ImGuiCol_Text, theme->formLabel);
     ImGui::SetNextItemWidth(size.x - S(40.0f));
-	ImGui::Text(label.c_str());
+	ImGui::Text("%s", label.c_str());
 	ImGui::PopStyleColor();
     ImGui::PopFont();
 }
@@ -323,7 +346,7 @@ void Widget::elHelp(std::string help) {
     ImGui::PushStyleColor(ImGuiCol_Text, theme->formHelpText);
     ImGui::SetNextItemWidth(size.x - S(60.0f));
     ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + size.x - S(60.0f));
-	ImGui::TextWrapped(help.c_str());
+	ImGui::TextWrapped("%s", help.c_str());
     ImGui::PopStyleColor();
 	ImGui::PopFont();
 }
@@ -335,7 +358,7 @@ void Widget::elError(std::string error) {
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
     ImGui::SetNextItemWidth(size.x - S(60.0f));
     ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + size.x - S(60.0f));
-    ImGui::TextWrapped(error.c_str());
+	ImGui::TextWrapped("%s", error.c_str());
     ImGui::PopTextWrapPos();
     ImGui::PopStyleColor();
     ImGui::PopFont();
@@ -351,7 +374,7 @@ void Widget::elParagraph(std::string text) {
     ImGui::PushStyleColor(ImGuiCol_Text, theme->panelText);
     ImGui::SetNextItemWidth(size.x - S(40.0f));
     ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + size.x - S(60.0f));
-    ImGui::TextWrapped(text.c_str());
+	ImGui::TextWrapped("%s", text.c_str());
     ImGui::PopStyleColor();
     ImGui::PopFont();
     ImGui::Dummy(SV(0.0f, 10.0f));
@@ -652,6 +675,63 @@ bool Widget::elCheckbox(std::string label, bool& isOn, std::string help, std::st
 
 }
 
+bool Widget::elRadio(
+    std::string label,
+    const std::vector<std::pair<int, std::string>>& options,
+    int& selectedValue,
+    std::string help,
+    std::string error
+) {
+
+    Theme* theme = ThemeController::getInstance().getActiveTheme();
+
+    bool response = false;
+    ImVec2 size = ImGui::GetContentRegionAvail();
+
+    if (!label.empty()) {
+        elLabel(label);
+    }
+
+    ImGui::PushFont(AppFonts::label);
+    ImGui::PushStyleColor(ImGuiCol_Text, theme->formLabel);
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, theme->formInputBackground);
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, theme->formInputBackground);
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, theme->formInputBackground);
+    ImGui::PushStyleColor(ImGuiCol_CheckMark, theme->formInputText);
+
+    if (!error.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+    }
+
+    // Each option writes to the same selectedValue, creating true radio-group behavior.
+    for (size_t i = 0; i < options.size(); ++i) {
+        ImGui::PushID(static_cast<int>(i));
+        if (ImGui::RadioButton(options[i].second.c_str(), &selectedValue, options[i].first)) {
+            response = true;
+        }
+        ImGui::PopID();
+    }
+
+    if (!error.empty()) {
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
+    }
+
+    ImGui::PopStyleColor(5);
+    ImGui::PopFont();
+
+    ImGui::SetNextItemWidth(size.x - S(20.0f));
+    elHelp(help);
+    elError(error);
+
+    if (!help.empty() || !error.empty()) {
+        ImGui::Dummy(SV(0.0f, 10.0f));
+    }
+
+    return response;
+}
+
 bool Widget::elSelect(std::string label,
     std::vector<std::pair<std::string, std::string>> options,
     string& callback, std::string help, std::string error) {
@@ -683,13 +763,23 @@ bool Widget::elSelect(std::string label,
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, theme->buttonPrimaryActive);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme->buttonPrimaryHovered);
     ImGui::PushStyleColor(ImGuiCol_Text, theme->formInputText);
+    ImGui::PushStyleColor(ImGuiCol_Header, theme->buttonSecondary);
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, theme->buttonPrimary);
+    ImGui::PushStyleColor(ImGuiCol_HeaderActive, theme->buttonPrimaryActive);
     if (ImGui::BeginCombo(inputLabel.c_str(), selected.c_str(), ImGuiComboFlags_HeightLarge)) {
         isPopupOpen = true;
         for (size_t i = 0; i < options.size(); ++i) {
             bool isSelected = (options[i].first == callback);
+
+            if (isSelected) {
+                ImGui::PushStyleColor(ImGuiCol_Text, theme->buttonSecondaryText);
+            }
             if (ImGui::Selectable(options[i].second.c_str(), isSelected)) {
                 callback = options[i].first;
                 itemSelected = true; // Store selection state
+            }
+            if (isSelected) {
+                ImGui::PopStyleColor();
             }
             if (isSelected) {
                 ImGui::SetItemDefaultFocus();
@@ -698,7 +788,7 @@ bool Widget::elSelect(std::string label,
         ImGui::EndCombo();
     }
 
-    ImGui::PopStyleColor(8);
+    ImGui::PopStyleColor(11);
 
     ImGui::SetNextItemWidth(size.x - S(20.0f));
     elHelp(help);
@@ -750,9 +840,23 @@ bool Widget::elMultiSelect(
     ImGui::PushStyleColor(ImGuiCol_FrameBg, theme->formInputBackground);
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, theme->formInputBackground);
     ImGui::PushStyleColor(ImGuiCol_FrameBgActive, theme->formInputBackground);
+    ImGui::PushStyleColor(ImGuiCol_Header, theme->buttonSecondary);
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, theme->buttonPrimary);
+    ImGui::PushStyleColor(ImGuiCol_HeaderActive, theme->buttonPrimaryActive);
 
     if (ImGui::BeginCombo(inputLabel.c_str(), preview.c_str(), ImGuiComboFlags_HeightLarge)) {
         isPopupOpen = true;
+
+        // Clear all button at the top of the dropdown.
+        if (!selectedValues.empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
+            if (ImGui::Selectable("Clear all", false, ImGuiSelectableFlags_DontClosePopups)) {
+                selectedValues.clear();
+                changed = true;
+            }
+            ImGui::PopStyleColor();
+            ImGui::Separator();
+        }
 
         for (const auto& opt : options) {
 
@@ -761,6 +865,10 @@ bool Widget::elMultiSelect(
                 selectedValues.end(),
                 opt.first
             ) != selectedValues.end();
+
+            if (isSelected) {
+                ImGui::PushStyleColor(ImGuiCol_Text, theme->buttonSecondaryText);
+            }
 
             if (ImGui::Selectable(
                     opt.second.c_str(),
@@ -780,12 +888,16 @@ bool Widget::elMultiSelect(
                     changed = true;
                 }
             }
+
+            if (isSelected) {
+                ImGui::PopStyleColor();
+            }
         }
 
         ImGui::EndCombo();
     }
 
-    ImGui::PopStyleColor(4);
+    ImGui::PopStyleColor(7);
 
     elHelp(help);
     elError(error);

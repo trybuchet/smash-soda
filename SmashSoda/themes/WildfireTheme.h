@@ -34,10 +34,11 @@ public:
         tab = hexToImVec4("#F2EEDDFF");
         tabText = hexToImVec4("#302E2BFF");
         tabHovered = primary;
+        tabHoveredBackground = hexToImVec4("#CC1515FF");
         tabActive = primary;
         tabActiveText = hexToImVec4("#FFFFFFFF");
 
-        navbarBackground = hexToImVec4("#0F0F0FFF");
+        navbarBackground = hexToImVec4("#302E2BFF");
         navbarBorder = hexToImVec4("#262626FF");
         navbarIcon = hexToImVec4("#FFFFFF26");
         navbarIconActive = secondary;

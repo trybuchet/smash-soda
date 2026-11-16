@@ -32,6 +32,7 @@ void GuestListWidget::guestItem(Guest& guest) {
     ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_Text, AppColors::formHelpText);
     ImGui::Text("#%d", guest.userID);
+    ImGui::PopStyleColor();
 
 }
 
@@ -366,6 +367,7 @@ void GuestListWidget::renderBannedGuests() {
             (string("Press to unban ") + name + "").c_str()
         );
 
+        bool unbanned = false;
         if (i == popupIndex)
         {
             if (ConfirmPopupWidget::render(
@@ -375,6 +377,7 @@ void GuestListWidget::renderBannedGuests() {
             ))
             {
                 Cache::cache.banList.unban(userID);
+                unbanned = true;
             }
         }
 
@@ -387,7 +390,7 @@ void GuestListWidget::renderBannedGuests() {
             ImGui::OpenPopup(string("Add reason").c_str());
         }
         TitleTooltipWidget::render("Add reason", string("Press to add reason").c_str());
-        if (i == popupEditIndex)
+        if (!unbanned && i == popupEditIndex)
         {
             if (PopupWidgetEdit::render(string("Add reason").c_str(), showEditPopup, reason))
             {
@@ -397,19 +400,25 @@ void GuestListWidget::renderBannedGuests() {
         }
 
         ImGui::SameLine();
-        
+
         ImGui::BeginGroup();
-            
+
             ImGui::PushStyleColor(ImGuiCol_Text, AppColors::panelText);
-            ImGui::Text("%s", _bannedGuests[i].name.c_str());
+            ImGui::Text("%s", name.c_str());
             ImGui::PopStyleColor();
             ImGui::SameLine();
             ImGui::PushStyleColor(ImGuiCol_Text, AppColors::formHelpText);
-            ImGui::Text("#%d", _bannedGuests[i].userID);
-            ImGui::Text(_bannedGuests[i].reason.c_str());
+            ImGui::Text("#%d", userID);
+			// Render guest-provided text via a fixed format string to avoid format-string crashes.
+			ImGui::Text("%s", reason.c_str());
             ImGui::PopStyleColor();
 
         ImGui::EndGroup();
+
+        if (unbanned) {
+            // List was mutated; stop iterating this frame to avoid out-of-bounds access.
+            break;
+        }
     }
 
     ImGui::EndChild();

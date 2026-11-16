@@ -65,6 +65,7 @@ public:
 	ImVec4 tab;
 	ImVec4 tabText;
 	ImVec4 tabHovered;
+	ImVec4 tabHoveredBackground;
 	ImVec4 tabActive;
 	ImVec4 tabActiveText;
 
